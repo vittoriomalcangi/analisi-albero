@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pannello sensori</title>
+<!--
+  PANNELLO SENSORI — pagina riservata all'amministratore          (15 ottobre 2026)
+  Sposta un sensore su un altro albero e mette in grigio gli alberi rimasti senza
+  sensore, con un pulsante invece di un comando.
+
+  • Usa lo STESSO login del form (accesso.js): stessa sessione, stesso gettone.
+  • Non parla mai col database: parla solo con la Edge Function `sensori-admin`,
+    che verifica che chi chiama sia `admin` e ha cinque azioni in lista chiusa.
+  • Ogni operazione che SCRIVE ha due tempi: prima «Controlla» (anteprima, non
+    scrive niente), poi «Conferma». Il pulsante di conferma si accende solo dopo
+    un'anteprima senza errori e si spegne se si cambia la scelta.
+  • Tutto ciò che arriva dal server è mostrato come TESTO, mai come HTML.
+  • Non tocca il form (Analisi_Albero.html) né nessuno dei suoi file.
+-->
+<style>
+  :root {
+    --sfondo:#f6f7f4; --carta:#fff; --testo:#1d2320; --tenue:#5d6761; --bordo:#d5dad4;
+    --verde:#1d7a46; --verde-sf:#e5f3ea; --giallo:#8a6100; --giallo-sf:#fbf1d6;
+    --rosso:#b3261e; --rosso-sf:#fbe5e3; --blu:#1f5fa8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-tema="chiaro"]) {
+      --sfondo:#141815; --carta:#1e2420; --testo:#e8ece8; --tenue:#9aa59d; --bordo:#37403a;
+      --verde:#58c487; --verde-sf:#1a3326; --giallo:#e8bd5a; --giallo-sf:#3a3015;
+      --rosso:#ff8a80; --rosso-sf:#41201d; --blu:#7fb2ee;
+    }
+  }
+  :root[data-tema="scuro"] {
+    --sfondo:#141815; --carta:#1e2420; --testo:#e8ece8; --tenue:#9aa59d; --bordo:#37403a;
+    --verde:#58c487; --verde-sf:#1a3326; --giallo:#e8bd5a; --giallo-sf:#3a3015;
+    --rosso:#ff8a80; --rosso-sf:#41201d; --blu:#7fb2ee;
+  }
+  :root { box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
+  *,*::before,*::after { box-sizing:inherit; }
+  html { scroll-padding-top:env(safe-area-inset-top,0px); }
+  body { margin:0; background:var(--sfondo); color:var(--testo);
+    font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+  main { max-width:760px; margin:0 auto; padding:14px 14px 40px; }
+  h1 { font-size:1.35rem; margin:.2rem 0 .3rem; }
+  h2 { font-size:1.05rem; margin:0 0 .6rem; }
+  .avviso { color:var(--tenue); font-size:.92rem; margin:0 0 1rem; }
+  section { background:var(--carta); border:1px solid var(--bordo); border-radius:12px; padding:14px; margin:0 0 14px; }
+  label { display:block; font-size:.88rem; color:var(--tenue); margin:.6rem 0 .2rem; }
+  select { width:100%; padding:11px 10px; font-size:1rem; border:1px solid var(--bordo); border-radius:8px;
+    background:var(--carta); color:var(--testo); }
+  .azioni { display:flex; flex-wrap:wrap; gap:8px; margin:.8rem 0 .2rem; }
+  button { font:inherit; font-weight:600; padding:11px 14px; border-radius:8px; border:1px solid var(--bordo);
+    background:var(--carta); color:var(--testo); cursor:pointer; min-height:44px; }
+  button.principale { background:var(--blu); border-color:var(--blu); color:#fff; }
+  button.pericolo { background:var(--rosso); border-color:var(--rosso); color:#fff; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  .righe { margin:.7rem 0 0; }
+  .riga { display:flex; gap:8px; padding:8px 10px; border-radius:8px; margin:0 0 6px; font-size:.95rem; }
+  .riga .icona { flex:0 0 1.2em; text-align:center; font-weight:700; }
+  .riga .passo { font-weight:700; margin-right:.35em; }
+  .riga.ok { background:var(--verde-sf); } .riga.ok .icona { color:var(--verde); }
+  .riga.attenzione { background:var(--giallo-sf); } .riga.attenzione .icona { color:var(--giallo); }
+  .riga.errore { background:var(--rosso-sf); } .riga.errore .icona { color:var(--rosso); }
+  .riga.info { background:var(--sfondo); border:1px solid var(--bordo); }
+  .tab { width:100%; border-collapse:collapse; font-size:.85rem; }
+  .tab th,.tab td { text-align:left; padding:6px 6px; border-bottom:1px solid var(--bordo); vertical-align:top; }
+  .tab th { color:var(--tenue); font-weight:600; }
+  .tabwrap { overflow-x:auto; }
+  .mono { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:.82rem; }
+  .nascosto { display:none; }
+  #stato { min-height:1.4em; font-size:.92rem; margin:0 0 .6rem; }
+  #stato.errore { color:var(--rosso); font-weight:600; }
+  #negato { background:var(--rosso-sf); border:1px solid var(--rosso); border-radius:12px; padding:14px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Pannello sensori</h1>
+  <p class="avviso">Pagina riservata all'amministratore. Non cambia niente finché non premi un pulsante di <strong>conferma</strong>.</p>
+  <div id="stato" role="status" aria-live="polite"></div>
+
+  <div id="negato" class="nascosto"></div>
+
+  <div id="riservato" class="nascosto">
+
+    <section id="sezSposta">
+      <h2>1 · Sposta un sensore</h2>
+      <p class="avviso" style="margin-bottom:.4rem">Prima fissa il sensore sul nuovo albero. Se hai già inserito il codice del sensore nel form, la mappatura è già spostata: qui si azzera il riferimento.</p>
+      <label for="selSensore">Sensore</label>
+      <select id="selSensore"></select>
+      <label for="selAlbero">Albero nuovo</label>
+      <select id="selAlbero"></select>
+      <div class="azioni">
+        <button id="btnAnteprima" class="principale">Controlla cosa succederà</button>
+      </div>
+      <div id="anteprima" class="righe"></div>
+      <div class="azioni">
+        <button id="btnSposta" class="pericolo" disabled>Conferma e sposta</button>
+      </div>
+      <div id="esitoSposta" class="righe"></div>
+    </section>
+
+    <section id="sezGrigio">
+      <h2>2 · Alberi rimasti senza sensore</h2>
+      <p class="avviso" style="margin-bottom:.4rem">Mostra gli alberi che non hanno più un sensore attivo ma hanno ancora uno stato acceso. Metterli in grigio non cancella niente.</p>
+      <div class="azioni">
+        <button id="btnCerca" class="principale">Cerca</button>
+      </div>
+      <div id="elencoGrigio" class="righe"></div>
+      <div class="azioni">
+        <button id="btnGrigio" class="pericolo" disabled>Metti in grigio</button>
+      </div>
+      <div id="esitoGrigio" class="righe"></div>
+    </section>
+
+    <section id="sezSensori">
+      <h2>Sensori</h2>
+      <div class="azioni" style="margin-top:0">
+        <button id="btnAggiorna">Aggiorna</button>
+      </div>
+      <div class="tabwrap">
+        <table class="tab">
+          <thead><tr><th>Sensore</th><th>Albero</th><th>Attivo</th><th>Ultimo invio</th><th>Primo avvio rif.</th></tr></thead>
+          <tbody id="tabSensori"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<script src="accesso.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var FUNZIONE = 'https://sldotadtisgekovgvsqr.supabase.co/functions/v1/sensori-admin';
+
+  var dati = { sensori: [], alberi: [] };
+  var anteprimaOk = null;      // { device, albero } dell'ultima anteprima SENZA errori
+  var daCongelare = null;      // elenco di alberi che l'utente ha VISTO
+  var occupato = false;
+  var partita = false;
+
+  function $(id) { return document.getElementById(id); }
+  function el(tag, classe, testo) {
+    var e = document.createElement(tag);
+    if (classe) e.className = classe;
+    if (testo != null) e.textContent = String(testo);   // SEMPRE testo, mai HTML
+    return e;
+  }
+  function svuota(n) { while (n.firstChild) n.removeChild(n.firstChild); }
+
+  function stato(testo, errore) {
+    var s = $('stato'); s.textContent = testo || ''; s.className = errore ? 'errore' : '';
+  }
+
+  function quando(iso) {
+    if (!iso) return '—';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '—';
+    try {
+      return d.toLocaleString('it-IT', { timeZone: 'Europe/Rome', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    } catch (e) { return d.toISOString(); }
+  }
+
+  // ── Rete: una sola porta, la Edge Function ───────────────────────────────
+  async function chiamaFunzione(corpo) {
+    var g = null;
+    try { g = await window.accesso.gettone(); } catch (e) { g = null; }
+    if (!g) throw erroreDi('Sessione scaduta: ricarica la pagina e rifai il login.', 401, null);
+    var r;
+    try {
+      r = await fetch(FUNZIONE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8', 'Authorization': 'Bearer ' + g },
+        body: JSON.stringify(corpo)
+      });
+    } catch (e) {
+      throw erroreDi('Non riesco a raggiungere il server (rete assente?). Non è stato cambiato niente.', 0, null);
+    }
+    var d = null;
+    try { d = await r.json(); } catch (e) { d = null; }
+    if (!r.ok) {
+      throw erroreDi((d && d.error && d.error.message) || ('Errore del server (codice ' + r.status + ').'), r.status, d);
+    }
+    return d;
+  }
+  function erroreDi(messaggio, codice, d) { var e = new Error(messaggio); e.codice = codice; e.dati = d; return e; }
+
+  // ── Disegno ──────────────────────────────────────────────────────────────
+  var ICONE = { ok: '✓', attenzione: '⚠', errore: '✕', info: '•' };
+  function righe(contenitore, elenco) {
+    svuota(contenitore);
+    (elenco || []).forEach(function (r) {
+      var esito = r.esito || 'info';
+      var riga = el('div', 'riga ' + esito);
+      riga.appendChild(el('span', 'icona', ICONE[esito] || '•'));
+      var corpo = el('span');
+      if (r.passo) corpo.appendChild(el('span', 'passo', r.passo + ':'));
+      corpo.appendChild(document.createTextNode(String(r.dettaglio == null ? '' : r.dettaglio)));
+      riga.appendChild(corpo);
+      contenitore.appendChild(riga);
+    });
+  }
+  function messaggio(contenitore, testo, esito) { righe(contenitore, [{ esito: esito || 'info', dettaglio: testo }]); }
+
+  function occupa(si) {
+    occupato = si;
+    ['btnAnteprima', 'btnCerca', 'btnAggiorna'].forEach(function (id) { $(id).disabled = si; });
+    aggiornaConferme();
+  }
+
+  function scelta() { return { device: $('selSensore').value, albero: $('selAlbero').value }; }
+
+  function aggiornaConferme() {
+    var s = scelta();
+    var puoSpostare = !occupato && anteprimaOk && anteprimaOk.device === s.device && anteprimaOk.albero === s.albero;
+    var b = $('btnSposta');
+    b.disabled = !puoSpostare;
+    b.textContent = puoSpostare ? ('Conferma: sposta ' + s.device + ' su ' + s.albero) : 'Conferma e sposta';
+    var g = $('btnGrigio');
+    var n = daCongelare ? daCongelare.length : 0;
+    g.disabled = occupato || n === 0;
+    g.textContent = n > 0 ? ('Conferma: metti in grigio ' + (n === 1 ? '1 albero' : n + ' alberi')) : 'Metti in grigio';
+  }
+
+  function invalidaAnteprima() {
+    anteprimaOk = null;
+    svuota($('anteprima'));
+    aggiornaConferme();
+  }
+
+  function disegnaSelezioni() {
+    var ss = $('selSensore'), sa = $('selAlbero');
+    var vecchioS = ss.value, vecchioA = sa.value;
+    svuota(ss); svuota(sa);
+    dati.sensori.forEach(function (s) {
+      var o = el('option', '', s.device_eui + ' — ' + (s.tree_id || 'senza albero') + ' — ultimo invio ' + quando(s.ultimo_invio));
+      o.value = s.device_eui; ss.appendChild(o);
+    });
+    dati.alberi.forEach(function (t) { var o = el('option', '', t); o.value = t; sa.appendChild(o); });
+    if (vecchioS) ss.value = vecchioS;
+    if (vecchioA) sa.value = vecchioA;
+  }
+
+  function disegnaTabella() {
+    var tb = $('tabSensori'); svuota(tb);
+    dati.sensori.forEach(function (s) {
+      var tr = el('tr');
+      tr.appendChild(el('td', 'mono', s.device_eui));
+      tr.appendChild(el('td', '', s.tree_id || '—'));
+      tr.appendChild(el('td', '', s.attivo ? 'sì' : 'no'));
+      tr.appendChild(el('td', '', quando(s.ultimo_invio)));
+      tr.appendChild(el('td', '', quando(s.primo_avvio)));
+      tb.appendChild(tr);
+    });
+  }
+
+  // ── Azioni ───────────────────────────────────────────────────────────────
+  async function carica() {
+    occupa(true); stato('Carico sensori e alberi…');
+    try {
+      var d = await chiamaFunzione({ azione: 'elenco' });
+      dati.sensori = d.sensori || []; dati.alberi = d.alberi || [];
+      disegnaSelezioni(); disegnaTabella();
+      stato(d.avviso || '', !!d.avviso);
+    } catch (e) { stato(e.message, true); }
+    occupa(false);
+  }
+
+  async function anteprima() {
+    var s = scelta();
+    if (!s.device || !s.albero) { stato('Scegli il sensore e l\'albero.', true); return; }
+    occupa(true); stato(''); anteprimaOk = null; svuota($('esitoSposta'));
+    try {
+      var d = await chiamaFunzione({ azione: 'anteprima', device_eui: s.device, albero: s.albero });
+      righe($('anteprima'), d.righe);
+      anteprimaOk = d.ok ? s : null;
+      if (!d.ok) stato('L\'anteprima segnala un errore: non si può spostare.', true);
+    } catch (e) { stato(e.message, true); svuota($('anteprima')); }
+    occupa(false);
+  }
+
+  async function sposta() {
+    var s = scelta();
+    if (!anteprimaOk || anteprimaOk.device !== s.device || anteprimaOk.albero !== s.albero) {
+      stato('La scelta è cambiata dopo l\'anteprima: ricontrolla prima di confermare.', true); return;
+    }
+    occupa(true); stato(''); svuota($('esitoSposta'));
+    try {
+      var d = await chiamaFunzione({ azione: 'sposta', conferma: true, device_eui: s.device, albero: s.albero });
+      righe($('esitoSposta'), (d.righe || []).map(function (r) { return { passo: r.passo, esito: r.passo === 'ATTENZIONE' ? 'attenzione' : 'ok', dettaglio: r.dettaglio }; }));
+      stato('Fatto: ' + s.device + ' → ' + s.albero + '.');
+      anteprimaOk = null; svuota($('anteprima'));
+      await caricaSenzaStato();
+    } catch (e) {
+      stato(e.message, true);
+      if (e.dati && e.dati.righe) righe($('esitoSposta'), e.dati.righe);
+      anteprimaOk = null;
+    }
+    occupa(false);
+  }
+
+  async function caricaSenzaStato() {
+    try {
+      var d = await chiamaFunzione({ azione: 'elenco' });
+      dati.sensori = d.sensori || []; dati.alberi = d.alberi || [];
+      disegnaSelezioni(); disegnaTabella();
+    } catch (e) { /* l'esito dell'operazione resta visibile; l'elenco si aggiorna col pulsante */ }
+  }
+
+  async function cerca() {
+    occupa(true); stato(''); daCongelare = null; svuota($('esitoGrigio'));
+    try {
+      var d = await chiamaFunzione({ azione: 'da_congelare' });
+      var lista = d.alberi || [];
+      if (!lista.length) {
+        messaggio($('elencoGrigio'), 'Nessun albero da mettere in grigio.', 'ok');
+      } else {
+        daCongelare = lista.map(function (a) { return a.tree_id; });
+        righe($('elencoGrigio'), lista.map(function (a) {
+          return { esito: 'attenzione', passo: a.tree_id,
+            dettaglio: 'stato ' + (a.stato_acuto || '—') + ' / ' + (a.stato_deriva || '—') + ' / ' + (a.stato_rischio || '—') +
+              (a.device_eui ? ' · sensore ' + a.device_eui : '') };
+        }));
+      }
+    } catch (e) { stato(e.message, true); svuota($('elencoGrigio')); }
+    occupa(false);
+  }
+
+  async function grigio() {
+    if (!daCongelare || !daCongelare.length) { stato('Cerca prima gli alberi.', true); return; }
+    occupa(true); stato(''); svuota($('esitoGrigio'));
+    var visti = daCongelare.slice();
+    try {
+      var d = await chiamaFunzione({ azione: 'congela', conferma: true, attesi: visti });
+      righe($('esitoGrigio'), (d.alberi || []).map(function (a) { return { esito: 'ok', passo: a.tree_id, dettaglio: a.esito }; }));
+      stato('Fatto: ' + (d.alberi || []).length + ' alberi messi in grigio.');
+      daCongelare = null; svuota($('elencoGrigio'));
+    } catch (e) {
+      stato(e.message, true);
+      daCongelare = null; svuota($('elencoGrigio'));      // l'elenco non è più affidabile: va ricercato
+    }
+    occupa(false);
+  }
+
+  // ── Avvio: solo dopo il login, solo per l'amministratore ────────────────
+  function parti() {
+    if (partita) return;
+    var a = window.accesso;
+    if (!a || !a.entrato || !a.entrato() || !a.utente) return;
+    partita = true;
+    var u = a.utente;
+    if (u.ruolo !== 'admin') {
+      var n = $('negato'); svuota(n);
+      n.appendChild(el('strong', '', 'Questa pagina è riservata all\'amministratore.'));
+      n.appendChild(el('div', '', 'Sei entrato come ' + (u.email || '?') + ' (' + (u.ruolo || '?') + ').'));
+      n.classList.remove('nascosto');
+      return;
+    }
+    $('riservato').classList.remove('nascosto');
+    carica();
+  }
+
+  $('selSensore').addEventListener('change', invalidaAnteprima);
+  $('selAlbero').addEventListener('change', invalidaAnteprima);
+  $('btnAnteprima').addEventListener('click', anteprima);
+  $('btnSposta').addEventListener('click', sposta);
+  $('btnCerca').addEventListener('click', cerca);
+  $('btnGrigio').addEventListener('click', grigio);
+  $('btnAggiorna').addEventListener('click', function () { invalidaAnteprima(); carica(); });
+
+  document.addEventListener('accesso-pronto', parti);
+  // Se il login è già finito prima che questo script ascoltasse, si controlla qui.
+  var tentativi = 0;
+  var giro = setInterval(function () {
+    parti();
+    if (partita || ++tentativi > 120) clearInterval(giro);
+  }, 500);
+  aggiornaConferme();
+})();
+</script>
+</body>
+</html>
