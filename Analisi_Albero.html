@@ -1,0 +1,1652 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Analisi Morfologica Albero</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    /* Verde bosco — colore primario */
+    --green:#2f6b4f;
+    --green-dark:#1d4733;
+    --green-deep:#143226;
+    --green-tint:#e6f1ea;
+    --green-tint-2:#d4e7db;
+    --green-line:#bcd8c6;
+    /* Avvisi */
+    --amber:#b45309;
+    --amber-bg:#fdf3e3;
+    --amber-line:#f0d29a;
+    /* Errori */
+    --red:#c62828;
+    --red-bg:#fcecec;
+    --red-line:#f3bcbc;
+    /* Neutri caldi */
+    --bg:#f6f4ec;
+    --card:#ffffff;
+    --ink:#15201a;
+    --ink-soft:#42504a;
+    --ink-faint:#6c7a72;
+    --line:#dcdcd0;
+    --line-soft:#e9e8dd;
+    --radius:16px;
+    --radius-sm:12px;
+    --shadow:0 1px 2px rgba(20,40,30,.06), 0 6px 16px rgba(20,40,30,.06);
+    --tap:54px;
+    --font:'Atkinson Hyperlegible', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --mono:ui-monospace, 'SF Mono', 'Roboto Mono', Menlo, Consolas, monospace;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:var(--font);
+    background:var(--bg);
+    color:var(--ink);
+    font-size:17px;
+    line-height:1.45;
+    -webkit-font-smoothing:antialiased;
+    -webkit-text-size-adjust:100%;
+    padding:0 0 env(safe-area-inset-bottom);
+  }
+  .hidden{display:none !important;}
+
+  /* ---------- App frame ---------- */
+  .app{
+    max-width:480px;
+    margin:0 auto;
+    min-height:100vh;
+    background:var(--bg);
+  }
+
+  /* ---------- Header ---------- */
+  .app-header{
+    position:sticky;
+    top:0;
+    z-index:30;
+    background:var(--green-deep);
+    color:#fff;
+    padding:calc(14px + env(safe-area-inset-top)) 20px 14px;
+    box-shadow:0 2px 10px rgba(0,0,0,.12);
+  }
+  .brand{display:flex;align-items:center;gap:11px;}
+  .brand-mark{
+    width:36px;height:36px;border-radius:50%;
+    background:var(--green);
+    display:flex;align-items:center;justify-content:center;
+    font-size:20px;line-height:1;flex:none;
+  }
+  .brand-text h1{font-size:17px;margin:0;font-weight:700;letter-spacing:.2px;}
+  .brand-text p{font-size:12.5px;margin:1px 0 0;color:#a9c9b6;letter-spacing:.4px;text-transform:uppercase;}
+
+  /* ---------- Stepper ---------- */
+  .stepper{
+    display:flex;
+    align-items:flex-start;
+    padding:16px 14px 4px;
+    background:var(--green-deep);
+    color:#fff;
+  }
+  .step-dot{
+    flex:1;
+    display:flex;flex-direction:column;align-items:center;gap:6px;
+    position:relative;
+    text-align:center;
+  }
+  .step-dot::before{
+    content:"";
+    position:absolute;
+    top:15px;left:-50%;
+    width:100%;height:2px;
+    background:rgba(255,255,255,.22);
+    z-index:0;
+  }
+  .step-dot:first-child::before{display:none;}
+  .step-dot.done::before{background:var(--green);}
+  .dot-circle{
+    width:30px;height:30px;border-radius:50%;
+    background:rgba(255,255,255,.13);
+    border:2px solid rgba(255,255,255,.28);
+    color:#cfe3d7;
+    display:flex;align-items:center;justify-content:center;
+    font-size:14px;font-weight:700;
+    position:relative;z-index:1;
+    transition:background .15s,border-color .15s,color .15s,transform .15s;
+  }
+  .dot-label{font-size:11px;color:#9bbca9;font-weight:700;letter-spacing:.2px;line-height:1.15;}
+  .step-dot.active .dot-circle{
+    background:#fff;border-color:#fff;color:var(--green-deep);
+    transform:scale(1.06);
+  }
+  .step-dot.active .dot-label{color:#fff;}
+  .step-dot.done .dot-circle{
+    background:var(--green);border-color:var(--green);color:#fff;
+  }
+  .step-dot.done .dot-circle::after{content:"✓";}
+  .step-dot.done .dot-circle .dot-num{display:none;}
+  .step-dot.done .dot-label{color:#cfe3d7;}
+
+  /* ---------- Content ---------- */
+  .content{padding:18px 16px 40px;}
+  .step{animation:fade .22s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+
+  .step-head{margin:2px 0 16px;}
+  .step-kicker{
+    font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+    color:var(--green);margin:0 0 4px;
+  }
+  .step-title{font-size:24px;font-weight:700;margin:0;line-height:1.2;}
+  .step-sub{font-size:15px;color:var(--ink-soft);margin:8px 0 0;}
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:18px 16px;
+    margin-bottom:14px;
+    box-shadow:var(--shadow);
+  }
+  .card-section-title{
+    font-size:13px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;
+    color:var(--ink-faint);margin:0 0 12px;
+    display:flex;align-items:center;gap:8px;
+  }
+
+  /* ---------- Form fields ---------- */
+  .field{margin-bottom:16px;}
+  .field:last-child{margin-bottom:0;}
+  .field label.lbl{
+    display:block;font-size:15px;font-weight:700;margin-bottom:7px;color:var(--ink);
+  }
+  .field .opt{font-weight:400;color:var(--ink-faint);font-size:13.5px;}
+  .field .help{
+    font-size:13.5px;color:var(--ink-soft);margin:0 0 9px;line-height:1.4;
+  }
+  input[type="text"],input[type="number"],select,textarea{
+    width:100%;
+    font-family:var(--font);
+    font-size:17px;
+    color:var(--ink);
+    background:#fff;
+    border:2px solid var(--line);
+    border-radius:var(--radius-sm);
+    padding:14px 14px;
+    min-height:var(--tap);
+    transition:border-color .15s, box-shadow .15s;
+    -webkit-appearance:none;appearance:none;
+  }
+  input:focus,select:focus,textarea:focus{
+    outline:none;border-color:var(--green);
+    box-shadow:0 0 0 3px var(--green-tint);
+  }
+  select{
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'%3E%3Cpath d='M1 1l6 6 6-6' fill='none' stroke='%232f6b4f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;
+    background-position:right 16px center;
+    padding-right:42px;
+  }
+  .input-suffix{position:relative;}
+  .input-suffix .suffix{
+    position:absolute;right:16px;top:50%;transform:translateY(-50%);
+    color:var(--ink-faint);font-weight:700;font-size:15px;pointer-events:none;
+  }
+  .input-suffix input{padding-right:46px;}
+  .required-empty{
+    border-color:var(--red) !important;
+    box-shadow:0 0 0 3px var(--red-bg) !important;
+  }
+  .req-star{color:var(--red);font-weight:700;}
+  .hint{
+    display:none;
+    font-size:13.5px;color:var(--red);font-weight:700;margin-top:7px;
+  }
+  .hint.visible{display:block;}
+
+  /* ---------- Buttons ---------- */
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    font-family:var(--font);font-size:17px;font-weight:700;
+    min-height:var(--tap);padding:14px 22px;width:100%;
+    border-radius:var(--radius-sm);border:2px solid transparent;
+    cursor:pointer;transition:transform .08s, background .15s, box-shadow .15s, opacity .15s;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .btn:active{transform:scale(.985);}
+  .btn-primary{background:var(--green);color:#fff;box-shadow:0 2px 8px rgba(47,107,79,.28);}
+  .btn-primary:active{background:var(--green-dark);}
+  .btn-primary:disabled{background:#c7cfc9;color:#fff;box-shadow:none;cursor:not-allowed;opacity:.85;}
+  .btn-ghost{background:#fff;color:var(--green-dark);border-color:var(--green-line);}
+  .btn-ghost:active{background:var(--green-tint);}
+  .btn-analyze{
+    background:var(--green);color:#fff;font-size:19px;min-height:62px;
+    box-shadow:0 4px 14px rgba(47,107,79,.34);
+  }
+  .btn-analyze:disabled{background:#c7cfc9;box-shadow:none;cursor:not-allowed;}
+  .btn-row{display:flex;gap:10px;margin-top:18px;}
+  .btn-row .btn{width:auto;flex:1;}
+  .btn-row .btn-back{flex:0 0 auto;width:auto;padding:14px 18px;}
+
+  /* ---------- Step 2 mode cards ---------- */
+  .mode-grid{display:flex;flex-direction:column;gap:14px;}
+  .mode-btn{
+    text-align:left;width:100%;
+    background:#fff;border:2px solid var(--line);
+    border-radius:var(--radius);padding:18px 16px;
+    cursor:pointer;font-family:var(--font);
+    display:flex;gap:15px;align-items:flex-start;
+    transition:border-color .15s, background .15s, box-shadow .15s, transform .08s;
+    box-shadow:var(--shadow);
+  }
+  .mode-btn:active{transform:scale(.99);}
+  .mode-btn .mb-icon{font-size:34px;line-height:1;flex:none;width:46px;text-align:center;}
+  .mode-btn .mb-title{font-size:18px;font-weight:700;margin:2px 0 5px;display:flex;align-items:center;gap:8px;}
+  .mode-btn .mb-desc{font-size:14px;color:var(--ink-soft);line-height:1.4;}
+  .mode-btn .mb-go{color:var(--green);font-weight:700;font-size:14px;margin-top:8px;display:flex;align-items:center;gap:4px;}
+  .mode-btn.selected{
+    border-color:var(--green);background:var(--green-tint);
+    box-shadow:0 0 0 3px var(--green-tint-2);
+  }
+
+  /* ---------- Photo slots (oriented) ---------- */
+  .slot-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .photo-slot{
+    position:relative;
+    border:2px dashed var(--green-line);
+    border-radius:var(--radius-sm);
+    background:var(--green-tint);
+    padding:13px 12px 14px;
+    min-height:152px;
+    cursor:pointer;
+    display:flex;flex-direction:column;
+    overflow:hidden;
+    transition:border-color .15s, background .15s, box-shadow .15s;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .photo-slot.drag-over{border-color:var(--green);background:var(--green-tint-2);box-shadow:0 0 0 3px var(--green-tint-2);}
+  .photo-slot.filled{border-style:solid;border-color:var(--green);background:var(--green-tint-2);}
+  .slot-dir{font-size:15px;font-weight:700;color:var(--green-dark);display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+  .slot-dir .opt-tag{font-size:11px;color:var(--ink-faint);font-weight:700;border:1px solid var(--line);border-radius:6px;padding:1px 5px;}
+  .slot-desc{font-size:12px;color:var(--ink-soft);line-height:1.35;margin-top:6px;flex:1;}
+  .slot-cta{
+    margin-top:8px;font-size:12.5px;font-weight:700;color:var(--green);
+    display:flex;align-items:center;gap:5px;
+  }
+  .photo-slot.filled .slot-cta{display:none;}
+  .photo-preview{display:none;}
+  .photo-preview.active{
+    display:block;position:absolute;inset:0;z-index:2;
+  }
+  .photo-preview.active img{width:100%;height:100%;object-fit:cover;display:block;}
+  .remove-btn{
+    position:absolute;top:7px;right:7px;z-index:3;
+    width:34px;height:34px;border-radius:50%;
+    background:rgba(20,32,26,.82);color:#fff;border:none;
+    font-size:16px;font-weight:700;cursor:pointer;line-height:1;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 1px 4px rgba(0,0,0,.3);
+  }
+  .photo-count{font-size:13.5px;color:var(--green-dark);font-weight:700;margin-top:13px;min-height:19px;text-align:center;}
+
+  /* ---------- Upload zone (multi, mode B) ---------- */
+  .upload-zone{
+    border:2px dashed var(--green-line);
+    border-radius:var(--radius-sm);
+    background:var(--green-tint);
+    padding:24px 16px;text-align:center;cursor:pointer;
+    transition:border-color .15s, background .15s, box-shadow .15s;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .upload-zone.drag-over{border-color:var(--green);background:var(--green-tint-2);box-shadow:0 0 0 3px var(--green-tint-2);}
+  .upload-zone .uz-icon{font-size:30px;}
+  .upload-zone .uz-title{font-weight:700;color:var(--green-dark);margin-top:6px;font-size:15.5px;}
+  .upload-zone .uz-sub{font-size:13px;color:var(--ink-soft);margin-top:3px;}
+  .preview-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:13px;}
+  .preview-grid:empty{display:none;}
+  .preview-item{position:relative;border-radius:10px;overflow:hidden;aspect-ratio:1;border:2px solid var(--green);background:var(--green-tint-2);}
+  .preview-item img{width:100%;height:100%;object-fit:cover;display:block;}
+  .preview-item .remove-btn{width:28px;height:28px;font-size:14px;top:5px;right:5px;}
+
+  /* ---------- Instruction callout ---------- */
+  .callout{
+    display:flex;gap:11px;
+    background:var(--green-tint);
+    border:1px solid var(--green-line);
+    border-radius:var(--radius-sm);
+    padding:13px 14px;margin-bottom:15px;
+    font-size:14px;color:var(--green-deep);line-height:1.45;
+  }
+  .callout .co-icon{font-size:18px;flex:none;line-height:1.3;}
+  .callout strong{font-weight:700;}
+
+  .sub-block{margin-top:4px;}
+  .sub-block + .sub-block{margin-top:22px;padding-top:20px;border-top:1px solid var(--line-soft);}
+  .block-label{
+    font-size:14px;font-weight:700;color:var(--ink);margin:0 0 4px;
+    display:flex;align-items:center;gap:7px;
+  }
+  .block-help{font-size:13px;color:var(--ink-soft);margin:0 0 12px;line-height:1.4;}
+  .radii-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .radii-grid .field{margin-bottom:0;}
+
+  /* ---------- Inclination toggle ---------- */
+  .incl-toggle{display:flex;gap:10px;margin-bottom:16px;}
+  .incl-toggle .toggle-btn{
+    flex:1;background:#fff;border:2px solid var(--line);border-radius:var(--radius-sm);
+    padding:13px 10px;cursor:pointer;font-family:var(--font);text-align:center;
+    transition:border-color .15s,background .15s,box-shadow .15s;
+  }
+  .toggle-btn .tg-icon{font-size:22px;}
+  .toggle-btn .tg-title{font-weight:700;font-size:14.5px;margin-top:3px;}
+  .toggle-btn .tg-sub{font-size:12px;color:var(--ink-faint);margin-top:1px;}
+  .toggle-btn.selected{border-color:var(--green);background:var(--green-tint);box-shadow:0 0 0 3px var(--green-tint-2);}
+
+  /* ---------- GPS ---------- */
+  .gps-status{
+    font-size:14.5px;font-weight:700;margin:12px 0 2px;min-height:20px;line-height:1.4;
+  }
+  .gps-loading{color:var(--amber);}
+  .gps-ok{color:var(--green-dark);}
+  .gps-error{color:var(--red);}
+  .gps-coords{
+    display:grid;grid-template-columns:auto auto;gap:4px 16px;
+    background:var(--green-tint);border:1px solid var(--green-line);
+    border-radius:var(--radius-sm);padding:13px 15px;margin-top:12px;
+    font-size:14.5px;
+  }
+  .gps-coords .gc-k{color:var(--green-deep);font-weight:700;}
+  .gps-coords .gc-v{color:var(--ink);font-weight:700;font-family:var(--mono);font-size:13.5px;text-align:right;}
+  .gps-manual-toggle{
+    display:inline-block;margin-top:14px;color:var(--green-dark);font-weight:700;
+    font-size:14px;cursor:pointer;-webkit-tap-highlight-color:transparent;
+    padding:6px 0;user-select:none;
+  }
+  .gps-manual{margin-top:10px;}
+  .gps-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .gps-fields .field{margin-bottom:0;}
+
+  /* ---------- Sensori ---------- */
+  .sensori-empty{
+    font-size:14px;color:var(--ink-faint);line-height:1.45;
+    background:var(--bg);border:1px dashed var(--line);border-radius:var(--radius-sm);
+    padding:14px;text-align:center;
+  }
+  .sensor-input-row{
+    display:flex;gap:8px;margin-top:11px;align-items:stretch;
+  }
+  .sensor-input-row input{flex:1;min-width:0;}
+  .btn-qr{
+    flex:none;width:54px;min-height:var(--tap);
+    background:var(--green-deep);color:#fff;border:none;border-radius:var(--radius-sm);
+    font-size:22px;cursor:pointer;-webkit-tap-highlight-color:transparent;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .btn-qr:active{background:#0d231a;}
+  .btn-sensor-confirm{
+    flex:none;min-height:var(--tap);padding:0 16px;
+    background:var(--green);color:#fff;border:none;border-radius:var(--radius-sm);
+    font-family:var(--font);font-size:15px;font-weight:700;cursor:pointer;
+    white-space:nowrap;-webkit-tap-highlight-color:transparent;
+  }
+  .btn-sensor-confirm:active{background:var(--green-dark);}
+  .sensor-card{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    background:var(--green-tint);border:1px solid var(--green-line);
+    border-radius:var(--radius-sm);padding:13px 14px;margin-top:11px;
+  }
+  .sensor-card-info{min-width:0;}
+  .sensor-deveui{
+    font-family:var(--mono);font-size:15px;font-weight:700;color:var(--green-deep);
+    letter-spacing:.5px;word-break:break-all;
+  }
+  .sensor-meta{font-size:12px;color:var(--ink-faint);font-weight:700;margin-top:3px;}
+  .sensor-card-fittizio{background:#fdf6e3;border-color:#e8d7a0;}
+  .sensor-fittizio-badge{
+    display:inline-block;font-family:var(--font, inherit);font-size:10px;font-weight:800;
+    letter-spacing:.5px;background:#e8b93a;color:#4a3600;border-radius:4px;
+    padding:1px 6px;margin-left:6px;vertical-align:middle;
+  }
+  .sensor-remove{
+    flex:none;width:36px;height:36px;border-radius:50%;
+    background:#fff;border:1px solid var(--green-line);color:var(--green-dark);
+    font-size:15px;font-weight:700;cursor:pointer;line-height:1;
+    display:flex;align-items:center;justify-content:center;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .sensor-remove:active{background:var(--green-tint-2);}
+
+  /* ---------- QR scanner ---------- */
+  .qr-scanner-wrap{
+    margin-top:13px;border:2px solid var(--green);border-radius:var(--radius-sm);
+    overflow:hidden;background:#000;position:relative;
+  }
+  .qr-video{width:100%;display:block;max-height:280px;object-fit:cover;background:#000;}
+  .qr-frame{
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:160px;height:160px;border:3px solid rgba(255,255,255,.9);
+    border-radius:14px;box-shadow:0 0 0 100vmax rgba(0,0,0,.28);pointer-events:none;
+  }
+  .qr-hint{
+    background:var(--green-deep);color:#cfe3d7;font-size:13px;font-weight:700;
+    padding:10px 14px;text-align:center;line-height:1.4;
+  }
+  .btn-qr-stop{
+    width:100%;background:#fff;color:var(--red);border:none;border-top:1px solid var(--green-line);
+    padding:13px;font-family:var(--font);font-size:15px;font-weight:700;cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  /* ---------- Tipo tronco ---------- */
+  .tronco-btn{
+    text-align:left;width:100%;background:#fff;border:2px solid var(--line);
+    border-radius:var(--radius);padding:15px 16px;cursor:pointer;font-family:var(--font);
+    display:flex;gap:13px;align-items:flex-start;
+    transition:border-color .15s,background .15s,box-shadow .15s,transform .08s;
+    box-shadow:var(--shadow);-webkit-tap-highlight-color:transparent;
+  }
+  .tronco-btn:active{transform:scale(.99);}
+  .tronco-btn .tb-icon{font-size:27px;line-height:1;flex:none;width:34px;text-align:center;}
+  .tronco-btn .tb-title{font-size:16.5px;font-weight:700;}
+  .tronco-btn .tb-desc{font-size:13px;color:var(--ink-soft);margin-top:3px;line-height:1.4;}
+  .tronco-btn.selected{border-color:var(--green);background:var(--green-tint);box-shadow:0 0 0 3px var(--green-tint-2);}
+
+  /* ---------- Info note (avviso non bloccante) ---------- */
+  .info-note{
+    display:none;margin-top:13px;
+    background:var(--amber-bg);border:1px solid var(--amber-line);
+    border-radius:var(--radius-sm);padding:12px 14px;
+    font-size:13.5px;color:#7a3c08;line-height:1.45;
+  }
+  .info-note.visible{display:flex;gap:9px;}
+  .info-note .in-icon{flex:none;font-size:16px;line-height:1.3;}
+
+  /* ---------- Conferma orientamento Nord ---------- */
+  .nord-instruction{
+    display:flex;gap:11px;background:var(--green-tint);border:1px solid var(--green-line);
+    border-radius:var(--radius-sm);padding:13px 14px;margin:16px 0 12px;
+    font-size:14px;color:var(--green-deep);line-height:1.45;
+  }
+  .nord-instruction .ni-icon{flex:none;font-size:19px;line-height:1.2;}
+  .check-row{
+    display:flex;gap:12px;align-items:flex-start;cursor:pointer;
+    padding:8px 2px;user-select:none;-webkit-tap-highlight-color:transparent;
+    border-radius:10px;
+  }
+  .check-row input{position:absolute;opacity:0;width:0;height:0;}
+  .check-box{
+    flex:none;width:28px;height:28px;border-radius:8px;
+    border:2px solid var(--green-line);background:#fff;
+    display:flex;align-items:center;justify-content:center;
+    font-size:17px;color:#fff;line-height:1;transition:background .15s,border-color .15s,box-shadow .15s;margin-top:1px;
+  }
+  .check-row input:checked + .check-box{background:var(--green);border-color:var(--green);}
+  .check-row input:checked + .check-box::after{content:"\2713";}
+  .check-row input:focus-visible + .check-box{box-shadow:0 0 0 3px var(--green-tint);}
+  .check-label{font-size:15px;font-weight:700;color:var(--ink);line-height:1.35;}
+  .check-row.required-missing .check-box{border-color:var(--red);box-shadow:0 0 0 3px var(--red-bg);}
+
+  /* ---------- Invio al foglio ---------- */
+  .send-status{
+    display:none;border-radius:var(--radius-sm);padding:13px 15px;
+    font-size:14.5px;font-weight:700;line-height:1.4;margin-top:2px;
+  }
+  .send-status.ok{display:block;background:#e4f3ea;color:#1d6b3f;border:1px solid #bfe3cd;}
+  .send-status.err{display:block;background:var(--red-bg);color:var(--red);border:1px solid var(--red-line);}
+  .send-status.loading{display:block;background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-line);}
+  /* File pronti da scaricare: il collegamento è il tocco che fa partire il download */
+  .file-pronto:empty{display:none;}
+  .file-pronto-link{
+    display:block;border-radius:var(--radius-sm);padding:14px 15px;margin-top:2px;
+    background:#e4f3ea;color:#1d6b3f;border:1px solid #bfe3cd;
+    font-size:15px;font-weight:700;line-height:1.4;text-decoration:none;
+    word-break:break-all;
+  }
+
+  /* ---------- Config foglio Google ---------- */
+  .webapp-config{margin-top:14px;}
+  .webapp-config-toggle{
+    width:100%;background:#fff;border:2px solid var(--line);
+    border-radius:var(--radius-sm);padding:13px 16px;
+    font-family:var(--font);font-size:15px;font-weight:700;color:var(--ink-soft);
+    cursor:pointer;text-align:left;display:flex;align-items:center;gap:8px;
+    -webkit-tap-highlight-color:transparent;transition:border-color .15s,background .15s;
+  }
+  .webapp-config-toggle:active{background:var(--bg);}
+  .webapp-config-toggle.configured{border-color:var(--green-line);color:var(--green-dark);background:var(--green-tint);}
+  .webapp-config-body{
+    background:#fff;border:2px solid var(--line);border-top:none;
+    border-radius:0 0 var(--radius-sm) var(--radius-sm);
+    padding:16px;margin-top:-6px;
+  }
+  .webapp-config-body input[type="text"]{font-size:15px;font-family:var(--mono);}
+  .webapp-config-body code{font-family:var(--mono);font-size:13px;background:var(--green-tint);padding:1px 5px;border-radius:5px;}
+  .webapp-config-status{
+    display:none;font-size:14px;font-weight:700;margin-top:12px;
+    border-radius:10px;padding:10px 12px;line-height:1.4;
+  }
+  .webapp-config-status.ok{display:block;background:#e4f3ea;color:#1d6b3f;border:1px solid #bfe3cd;}
+  .webapp-config-status.err{display:block;background:var(--red-bg);color:var(--red);border:1px solid var(--red-line);}
+
+  /* ---------- Error boxes ---------- */
+  .step-error{
+    display:none;
+    background:var(--red-bg);border:1px solid var(--red-line);
+    color:var(--red);border-radius:var(--radius-sm);
+    padding:12px 14px;font-size:14px;font-weight:700;margin-top:14px;
+    line-height:1.4;
+  }
+  .step-error.visible{display:block;}
+  .error-box{
+    display:none;
+    background:var(--red-bg);border:1px solid var(--red-line);
+    color:var(--red);border-radius:var(--radius-sm);
+    padding:13px 15px;font-size:14.5px;font-weight:700;margin-top:14px;line-height:1.4;
+  }
+  .error-box.active{display:block;}
+
+  /* ---------- Diagnostica AI ---------- */
+  .ai-diag{margin-top:14px;}
+  .ai-diag-btn{
+    width:100%;background:#fff;border:2px solid var(--line);
+    border-radius:var(--radius-sm);padding:13px 16px;
+    font-family:var(--font);font-size:15px;font-weight:700;color:var(--ink-soft);
+    cursor:pointer;text-align:center;-webkit-tap-highlight-color:transparent;
+    transition:border-color .15s,background .15s;
+  }
+  .ai-diag-btn:active{background:var(--bg);}
+  .ai-diag-btn:disabled{opacity:.6;cursor:default;}
+  .ai-diag-status{
+    display:none;font-size:14px;font-weight:700;margin-top:10px;
+    border-radius:10px;padding:10px 12px;line-height:1.4;
+  }
+  .ai-diag-status.ok{display:block;background:#e4f3ea;color:#1d6b3f;border:1px solid #bfe3cd;}
+  .ai-diag-status.err{display:block;background:var(--red-bg);color:var(--red);border:1px solid var(--red-line);}
+  .ai-diag-status.loading{display:block;background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-line);}
+
+  /* ---------- Step 4 recap ---------- */
+  .recap{
+    background:var(--green-tint);border:1px solid var(--green-line);
+    border-radius:var(--radius);padding:6px 18px;margin-bottom:18px;
+  }
+  .recap-row{
+    display:flex;justify-content:space-between;align-items:center;gap:12px;
+    padding:11px 0;border-bottom:1px solid var(--green-line);
+  }
+  .recap-row:last-child{border-bottom:none;}
+  .recap-row .rk{font-size:14px;color:var(--green-deep);font-weight:700;}
+  .recap-row .rv{font-size:15px;color:var(--ink);font-weight:700;text-align:right;}
+  .recap-row .rv.empty{color:var(--ink-faint);font-weight:400;}
+
+  /* ---------- Loading ---------- */
+  .loading{
+    display:none;
+    flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:64px 24px;min-height:60vh;
+  }
+  .loading.active{display:flex;}
+  .spinner{
+    width:54px;height:54px;border-radius:50%;
+    border:5px solid var(--green-tint-2);
+    border-top-color:var(--green);
+    animation:spin .9s linear infinite;
+    margin-bottom:22px;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .loading-title{font-size:19px;font-weight:700;color:var(--green-dark);}
+  .loading-text{font-size:15px;color:var(--ink-soft);margin-top:8px;min-height:22px;}
+
+  /* ---------- Results ---------- */
+  .results{display:none;}
+  .results.active{display:block;animation:fade .25s ease;}
+  .results-head{text-align:center;margin:6px 0 20px;}
+  .results-head .rh-check{
+    width:58px;height:58px;border-radius:50%;background:var(--green-tint);
+    border:2px solid var(--green-line);
+    display:flex;align-items:center;justify-content:center;font-size:30px;margin:0 auto 12px;
+  }
+  .results-head h2{font-size:23px;margin:0;font-weight:700;}
+  .badges{display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap;}
+  .badge{font-size:12px;font-weight:700;letter-spacing:.3px;padding:6px 12px;border-radius:999px;text-transform:lowercase;}
+  .mode-badge{background:var(--green-tint);color:var(--green-dark);border:1px solid var(--green-line);}
+  .confidence-badge{border:1px solid transparent;}
+  .confidence-high{background:#e4f3ea;color:#1d6b3f;border-color:#bfe3cd;}
+  .confidence-med{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-line);}
+  .confidence-low{background:var(--red-bg);color:var(--red);border-color:var(--red-line);}
+
+  .metrics-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:18px;}
+  .metric{
+    background:#fff;border:1px solid var(--line);border-radius:var(--radius-sm);
+    padding:13px 14px;box-shadow:var(--shadow);
+  }
+  .metric-label{font-size:12.5px;color:var(--ink-faint);font-weight:700;text-transform:uppercase;letter-spacing:.3px;line-height:1.25;}
+  .metric-value{font-size:24px;font-weight:700;color:var(--ink);margin-top:6px;line-height:1.1;}
+  .metric-unit{font-size:14px;color:var(--ink-faint);font-weight:700;margin-left:3px;}
+  .metric-note{font-size:11.5px;color:var(--ink-faint);margin-top:4px;line-height:1.3;}
+
+  .soglia-box{
+    display:none;
+    background:linear-gradient(160deg,var(--green) 0%,var(--green-dark) 100%);
+    color:#fff;border-radius:var(--radius);padding:24px 20px;text-align:center;
+    margin-bottom:18px;box-shadow:0 6px 20px rgba(29,71,51,.3);
+  }
+  .soglia-box .sb-label{font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#bfe0cd;}
+  .soglia-value{font-size:64px;font-weight:700;line-height:1;margin:8px 0 12px;letter-spacing:-1px;}
+  .soglia-desc{font-size:13.5px;color:#dceee3;line-height:1.5;}
+
+  .ai-note{
+    background:#fff;border:1px solid var(--line);border-radius:var(--radius);
+    padding:17px 16px;font-size:14.5px;color:var(--ink-soft);line-height:1.55;margin-bottom:14px;
+    box-shadow:var(--shadow);
+  }
+  .ai-note strong{color:var(--ink);}
+
+  .incl-warn{
+    display:none;
+    background:var(--amber-bg);border:1px solid var(--amber-line);
+    border-radius:var(--radius);padding:15px 16px;font-size:14px;color:#7a3c08;
+    line-height:1.5;margin-bottom:14px;
+  }
+  .incl-warn strong{color:var(--amber);}
+
+  .report-box{
+    display:none;
+    margin-top:12px;
+  }
+  .report-box textarea{
+    width:100%;min-height:300px;font-family:var(--mono);font-size:12px;line-height:1.5;
+    background:#fbfaf4;border:1px solid var(--line);border-radius:var(--radius-sm);
+    padding:14px;resize:vertical;color:var(--ink);
+  }
+  .report-box .copy-btn{margin-top:10px;}
+  .copy-btn.copied{background:#1d6b3f !important;}
+
+  .results-actions{margin-top:8px;display:flex;flex-direction:column;gap:11px;}
+
+  .footnote{
+    text-align:center;font-size:12px;color:var(--ink-faint);
+    padding:22px 20px 8px;line-height:1.5;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ===== Header ===== -->
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-mark">🌳</div>
+      <div class="brand-text">
+        <h1>Analisi Morfologica Albero</h1>
+        <p>Parco IoT · rilievo sul campo</p>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===== Stepper ===== -->
+  <nav class="stepper" aria-label="Avanzamento">
+    <div class="step-dot active" id="sdot1"><div class="dot-circle"><span class="dot-num">1</span></div><div class="dot-label">Albero</div></div>
+    <div class="step-dot" id="sdot2"><div class="dot-circle"><span class="dot-num">2</span></div><div class="dot-label">Chioma</div></div>
+    <div class="step-dot" id="sdot3"><div class="dot-circle"><span class="dot-num">3</span></div><div class="dot-label">Rilievo</div></div>
+    <div class="step-dot" id="sdot4"><div class="dot-circle"><span class="dot-num">4</span></div><div class="dot-label">Analisi</div></div>
+  </nav>
+
+  <main class="content">
+
+    <!-- ============================================================ -->
+    <!-- FORM -->
+    <!-- ============================================================ -->
+    <section id="formSection">
+
+      <!-- ===================== STEP 1 ===================== -->
+      <div class="step" id="step1" data-screen-label="Step 1 — Dati albero">
+        <div class="step-head">
+          <p class="step-kicker">Passo 1 di 4</p>
+          <h2 class="step-title">Dati dell'albero</h2>
+          <p class="step-sub">Identifica l'albero, misura il fusto, rileva la posizione e associa i sensori.</p>
+        </div>
+
+        <div class="card">
+          <div class="field">
+            <label class="lbl" for="treeCode">Codice / Nome albero <span class="opt">— opzionale</span></label>
+            <input type="text" id="treeCode" placeholder="es. QUERCIA-07" autocomplete="off">
+          </div>
+
+          <div class="field">
+            <label class="lbl" for="treeSpecies">Specie <span class="opt">— opzionale</span></label>
+            <input type="text" id="treeSpecies" placeholder="es. Quercia" autocomplete="off">
+          </div>
+
+          <div class="field">
+            <label class="lbl" for="dbh">Circonferenza fusto a 1,3 m <span class="req-star">*</span></label>
+            <p class="help">Avvolgi il metro a nastro attorno al fusto a circa 1,3 m da terra. Leggi il numero dove si chiude. Il diametro (DBH) viene calcolato in automatico.</p>
+            <div class="input-suffix">
+              <input type="number" id="dbh" placeholder="es. 141" inputmode="decimal" min="0" step="0.1">
+              <span class="suffix">cm</span>
+            </div>
+            <div class="metric-note" id="diametroCalc" style="display:none;"></div>
+            <div class="hint" id="hintDbh">Campo obbligatorio</div>
+          </div>
+
+          <div class="field">
+            <label class="lbl" for="soilType">Tipo terreno</label>
+            <select id="soilType">
+              <option value="normale">Normale / compatto</option>
+              <option value="sabbioso">Sabbioso / sciolto</option>
+              <option value="argilloso">Argilloso / pesante</option>
+              <option value="roccioso">Roccioso</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="step-error" id="errStep1">Inserisci la circonferenza del fusto per continuare.</div>
+
+        <!-- ---------- Tipo di tronco ---------- -->
+        <div class="card" id="troncoCard">
+          <div class="card-section-title">🪵 Tipo di tronco <span class="req-star">*</span></div>
+          <p class="help" style="margin-bottom:13px;">Definisce il profilo fisico del fusto usato per calcolare la soglia.</p>
+          <div class="mode-grid">
+            <button class="tronco-btn selected" id="btnTroncoLegnoso" onclick="selectTipoFusto('legnoso')">
+              <div class="tb-icon">🌳</div>
+              <div><div class="tb-title">Legnoso (maturo)</div><div class="tb-desc">Alberi adulti a fusto legnoso: quercia, platano, tiglio, pino adulto. È il caso standard.</div></div>
+            </button>
+            <button class="tronco-btn" id="btnTroncoGiovane" onclick="selectTipoFusto('giovane')">
+              <div class="tb-icon">🌱</div>
+              <div><div class="tb-title">Giovane</div><div class="tb-desc">Alberi di recente impianto, fusti sottili e più elastici.</div></div>
+            </button>
+            <button class="tronco-btn" id="btnTroncoFibroso" onclick="selectTipoFusto('fibroso')">
+              <div class="tb-icon">🌴</div>
+              <div><div class="tb-title">Fibroso</div><div class="tb-desc">Palme e fusti non legnosi: struttura fibrosa, niente anelli, molto flessibile.</div></div>
+            </button>
+          </div>
+          <input type="hidden" id="tipoFusto" value="legnoso">
+          <div class="info-note" id="tipoFustoWarn"><span class="in-icon">ℹ️</span><div>Per questo tipo di tronco la soglia calcolata dalla fisica è meno affidabile; il sistema darà più peso al comportamento osservato nel tempo.</div></div>
+        </div>
+
+        <!-- ---------- Forma chioma ---------- -->
+        <div class="card" id="formaChiomaCard">
+          <div class="card-section-title">🌿 Forma della chioma</div>
+          <p class="help" style="margin-bottom:13px;">Classificazione visiva generale della chioma. L'AI affinerà la stima dalle foto.</p>
+          <div class="field">
+            <label class="lbl" for="formaChioma">Forma prevalente</label>
+            <select id="formaChioma">
+              <option value="sferica">Sferica / arrotondata</option>
+              <option value="espansa">Espansa / ombrello</option>
+              <option value="colonnare">Colonnare / piramidale</option>
+              <option value="irregolare">Irregolare / asimmetrica</option>
+              <option value="piangente">Piangente</option>
+            </select>
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label class="lbl" for="cdSpecieSelect">Coefficiente Cd specie <span class="opt">— opzionale</span></label>
+            <p class="help">Resistenza aerodinamica della chioma (da tabella Cw). Scegli la specie dall'elenco oppure inserisci il valore manualmente. Lascia vuoto per usare la stima dell'AI.</p>
+            <select id="cdSpecieSelect" onchange="aggiornaCD(this.value)" style="margin-bottom:8px;">
+              <option value="">— Scegli specie dalla lista —</option>
+              <optgroup label="Querce e Fagacee">
+                <option value="0.25">Quercus robur — 0.25</option>
+                <option value="0.25">Quercus rubra — 0.25</option>
+                <option value="0.25">Quercus ilex (Leccio) — 0.25</option>
+                <option value="0.25">Fagus sylvatica (Faggio) — 0.25</option>
+                <option value="0.25">Castanea sativa (Castagno) — 0.25</option>
+              </optgroup>
+              <optgroup label="Platano e Olmo">
+                <option value="0.31">Platanus × hispanica — 0.31</option>
+                <option value="0.31">Platanus orientalis — 0.31</option>
+                <option value="0.37">Ulmus minor — 0.37</option>
+                <option value="0.37">Ulmus glabra — 0.37</option>
+              </optgroup>
+              <optgroup label="Aceri">
+                <option value="0.25">Acer platanoides — 0.25</option>
+                <option value="0.25">Acer pseudoplatanus — 0.25</option>
+                <option value="0.25">Acer saccharinum — 0.25</option>
+                <option value="0.29">Acer negundo — 0.29</option>
+              </optgroup>
+              <optgroup label="Tigli e Ippocastano">
+                <option value="0.25">Tilia × europaea — 0.25</option>
+                <option value="0.24">Tilia cordata — 0.24</option>
+                <option value="0.23">Tilia americana — 0.23</option>
+                <option value="0.35">Aesculus hippocastanum — 0.35</option>
+              </optgroup>
+              <optgroup label="Conifere">
+                <option value="0.20">Pinus sylvestris — 0.20</option>
+                <option value="0.18">Pinus pinea — 0.18</option>
+                <option value="0.20">Pinus strobus — 0.20</option>
+                <option value="0.20">Picea abies — 0.20</option>
+                <option value="0.15">Cedrus atlantica — 0.15</option>
+                <option value="0.20">Cedrus deodara — 0.20</option>
+                <option value="0.20">Pseudotsuga menziesii — 0.20</option>
+              </optgroup>
+              <optgroup label="Robinia e Leguminose">
+                <option value="0.20">Robinia pseudoacacia — 0.20</option>
+                <option value="0.18">Robinia pseudoacacia (Robinia) — 0.18</option>
+                <option value="0.15">Ailanthus altissima — 0.15</option>
+              </optgroup>
+              <optgroup label="Pioppi e Salici">
+                <option value="0.22">Populus alba — 0.22</option>
+                <option value="0.33">Populus canadensis — 0.33</option>
+                <option value="0.28">Populus nigra — 0.28</option>
+                <option value="0.21">Salix alba — 0.21</option>
+              </optgroup>
+              <optgroup label="Frassini e Noci">
+                <option value="0.37">Fraxinus excelsior — 0.37</option>
+                <option value="0.24">Fraxinus americana — 0.24</option>
+                <option value="0.18">Juglans regia — 0.18</option>
+                <option value="0.34">Juglans nigra — 0.34</option>
+              </optgroup>
+              <optgroup label="Altre specie">
+                <option value="0.25">Sophora japonica — 0.25</option>
+                <option value="0.41">Quercus robur (rovere) — 0.41</option>
+                <option value="0.42">Carpinus betulus — 0.42</option>
+                <option value="0.40">Sequoia sempervirens — 0.40</option>
+                <option value="0.31">Betula pendula — 0.31</option>
+              </optgroup>
+            </select>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <input type="number" id="cdSpecie" inputmode="decimal" min="0.05" max="1.5" step="0.01" placeholder="o inserisci manualmente" style="flex:1;" oninput="document.getElementById('cdSpecieSelect').value='';">
+              <span class="suffix" style="flex:none;">Cd</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ---------- Posizione GPS ---------- -->
+        <div class="card" id="gpsCard">
+          <div class="card-section-title">📍 Posizione GPS <span class="req-star">*</span></div>
+          <p class="help" style="margin-bottom:13px;">Serve a collocare l'albero sulla mappa di monitoraggio. Stai vicino al fusto quando rilevi la posizione.</p>
+          <button class="btn btn-primary" id="btnGps" onclick="getGPS()">📍 Usa posizione attuale</button>
+          <div class="gps-status" id="gpsStatus"></div>
+          <div class="gps-coords hidden" id="gpsCoords">
+            <span class="gc-k">Latitudine</span><span class="gc-v" id="gpsLat">—</span>
+            <span class="gc-k">Longitudine</span><span class="gc-v" id="gpsLng">—</span>
+            <span class="gc-k">Precisione</span><span class="gc-v" id="gpsAcc">—</span>
+          </div>
+          <span class="gps-manual-toggle" onclick="toggleGpsManual()">▸ Inserisci coordinate manualmente</span>
+          <div class="gps-manual hidden" id="gpsManual">
+            <div class="gps-fields">
+              <div class="field">
+                <label class="lbl" for="gpsLatManual">Latitudine</label>
+                <input type="number" id="gpsLatManual" inputmode="decimal" step="0.00001" placeholder="es. 45.46427" oninput="updateGpsFromManual()">
+              </div>
+              <div class="field">
+                <label class="lbl" for="gpsLngManual">Longitudine</label>
+                <input type="number" id="gpsLngManual" inputmode="decimal" step="0.00001" placeholder="es. 9.18951" oninput="updateGpsFromManual()">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="step-error" id="errGps">Rileva o inserisci la posizione GPS per continuare.</div>
+
+        <!-- ---------- Valutazione agronomo ---------- -->
+        <div class="card" id="agronomoCard">
+          <div class="card-section-title">🩺 Valutazione agronomo <span class="req-star">*</span></div>
+          <div class="callout">
+            <span class="co-icon">📋</span>
+            <div><strong>Requisito di installazione.</strong> Prima di montare il sensore, un agronomo o arborista deve valutare la salute dell'albero. Registra qui l'esito: certifica lo stato di partenza.</div>
+          </div>
+          <div class="field">
+            <label class="lbl">Esito valutazione <span class="req-star">*</span></label>
+            <div class="incl-toggle">
+              <button class="toggle-btn" id="btnSaluteSano" onclick="selectSalute('sano')"><div class="tg-icon">✅</div><div class="tg-title">Albero sano</div></button>
+              <button class="toggle-btn" id="btnSaluteAnomalie" onclick="selectSalute('anomalie')"><div class="tg-icon">⚠️</div><div class="tg-title">Anomalie rilevate</div></button>
+            </div>
+            <input type="hidden" id="saluteEsito" value="">
+          </div>
+          <div class="info-note" id="saluteWarn"><span class="in-icon">⚠️</span><div>Annotare le anomalie: lo stato di salute di partenza è importante per l'interpretazione futura dei dati.</div></div>
+          <div class="field">
+            <label class="lbl" for="saluteAgronomo">Nome agronomo <span class="opt">— opzionale</span></label>
+            <input type="text" id="saluteAgronomo" placeholder="es. Dott.ssa Bianchi" autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="lbl" for="saluteData">Data valutazione</label>
+            <input type="date" id="saluteData">
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label class="lbl" for="saluteNote">Note <span class="opt" id="saluteNoteOpt">— opzionale</span></label>
+            <textarea id="saluteNote" rows="3" placeholder="Eventuali osservazioni sullo stato dell'albero"></textarea>
+          </div>
+        </div>
+        <div class="step-error" id="errSalute">Registra l'esito della valutazione dell'agronomo per continuare.</div>
+
+        <!-- ---------- Sensori associati ---------- -->
+        <div class="card" id="sensoriCard">
+          <div class="card-section-title">📡 Sensori associati <span class="req-star">*</span></div>
+          <p class="help" style="margin-bottom:4px;">Associa almeno un sensore tilt Milesight. Scansiona il QR sulla scatola oppure digita il DevEUI (16 caratteri).</p>
+          <div id="sensoriList">
+            <div class="sensori-empty" id="sensoriEmpty">Nessun sensore associato. Tocca “Aggiungi sensore” per iniziare.</div>
+          </div>
+          <div class="qr-scanner-wrap hidden" id="qrScannerWrap">
+            <video class="qr-video" id="qrVideo" playsinline muted></video>
+            <div class="qr-frame"></div>
+            <div class="qr-hint">Inquadra il codice QR sulla scatola del sensore</div>
+            <button class="btn-qr-stop" onclick="stopQR()">✕ Chiudi scanner</button>
+          </div>
+          <button class="btn btn-ghost" style="margin-top:13px;" onclick="addSensorUI()">➕ Aggiungi sensore</button>
+
+          <div class="nord-instruction">
+            <span class="ni-icon">🧭</span>
+            <div>Installa il sensore orientato a <strong>Nord</strong>. È il riferimento fisso per leggere gli assi del sensore e la direzione del vento.</div>
+          </div>
+          <label class="check-row" id="nordRow">
+            <input type="checkbox" id="sensoreNord">
+            <span class="check-box"></span>
+            <span class="check-label">Confermo che il sensore è orientato a Nord</span>
+          </label>
+          <div class="step-error" id="errNord" style="margin-top:12px;">Conferma l'orientamento a Nord del sensore per continuare.</div>
+        </div>
+        <div class="step-error" id="errSensori">Associa almeno un sensore per continuare.</div>
+
+        <button class="btn btn-primary" id="btnStep1Next" onclick="goToStep(2)">Avanti →</button>
+      </div>
+
+      <!-- ===================== STEP 2 ===================== -->
+      <div class="step hidden" id="step2" data-screen-label="Step 2 — Tipo di chioma">
+        <div class="step-head">
+          <p class="step-kicker">Passo 2 di 4</p>
+          <h2 class="step-title">Tipo di chioma</h2>
+          <p class="step-sub">La chioma di questo albero è libera o si mescola con altri alberi vicini?</p>
+        </div>
+
+        <div class="mode-grid">
+          <button class="mode-btn" id="btnModeIsolated" onclick="selectMode('isolated')">
+            <div class="mb-icon">🌳</div>
+            <div>
+              <div class="mb-title">Chioma libera</div>
+              <div class="mb-desc">L'albero è isolato o ben distanziato. Si vede tutta la chioma.</div>
+              <div class="mb-go">Rilievo con 4 foto orientate →</div>
+            </div>
+          </button>
+
+          <button class="mode-btn" id="btnModeDense" onclick="selectMode('dense')">
+            <div class="mb-icon">🌲🌲</div>
+            <div>
+              <div class="mb-title">Chiome sovrapposte</div>
+              <div class="mb-desc">Le chiome si toccano o si mescolano con gli alberi vicini.</div>
+              <div class="mb-go">Misure manuali + foto →</div>
+            </div>
+          </button>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-ghost btn-back" onclick="goToStep(1)">← Indietro</button>
+        </div>
+      </div>
+
+      <!-- ===================== STEP 3 ===================== -->
+      <div class="step hidden" id="step3" data-screen-label="Step 3 — Rilievo">
+        <div class="step-head">
+          <p class="step-kicker">Passo 3 di 4</p>
+          <h2 class="step-title">Rilievo</h2>
+        </div>
+
+        <!-- ---------- VARIANTE A: foto orientate ---------- -->
+        <div id="modeIsolatedCard" class="hidden">
+          <div class="callout">
+            <span class="co-icon">🧭</span>
+            <div>Apri la <strong>bussola</strong> del telefono. Allontanati dall'albero finché lo vedi intero. Fai <strong>4 foto in sequenza</strong> partendo da Nord e girando in senso orario.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-section-title">📷 Foto orientate N · E · S · O</div>
+            <div class="slot-grid">
+
+              <div class="photo-slot" id="zoneN" onclick="if(!event.target.closest('.remove-btn'))document.getElementById('fileN').click()">
+                <input type="file" id="fileN" accept="image/*" capture="environment" hidden>
+                <div class="slot-dir">Da Nord ⬆️</div>
+                <div class="slot-desc">Sei a Nord, fotografi verso Sud → raggio Est (destra) e Ovest (sinistra).</div>
+                <div class="slot-cta">📷 Tocca per scattare</div>
+                <div class="photo-preview" id="previewN"></div>
+              </div>
+
+              <div class="photo-slot" id="zoneE" onclick="if(!event.target.closest('.remove-btn'))document.getElementById('fileE').click()">
+                <input type="file" id="fileE" accept="image/*" capture="environment" hidden>
+                <div class="slot-dir">Da Est ➡️</div>
+                <div class="slot-desc">Sei a Est, fotografi verso Ovest → raggio Nord (destra) e Sud (sinistra).</div>
+                <div class="slot-cta">📷 Tocca per scattare</div>
+                <div class="photo-preview" id="previewE"></div>
+              </div>
+
+              <div class="photo-slot" id="zoneS" onclick="if(!event.target.closest('.remove-btn'))document.getElementById('fileS').click()">
+                <input type="file" id="fileS" accept="image/*" capture="environment" hidden>
+                <div class="slot-dir">Da Sud ⬇️</div>
+                <div class="slot-desc">Sei a Sud, fotografi verso Nord → conferma raggio Est e Ovest.</div>
+                <div class="slot-cta">📷 Tocca per scattare</div>
+                <div class="photo-preview" id="previewS"></div>
+              </div>
+
+              <div class="photo-slot" id="zoneO" onclick="if(!event.target.closest('.remove-btn'))document.getElementById('fileO').click()">
+                <input type="file" id="fileO" accept="image/*" capture="environment" hidden>
+                <div class="slot-dir">Da Ovest ⬅️ <span class="opt-tag">opzionale</span></div>
+                <div class="slot-desc">Sei a Ovest, fotografi verso Est → conferma raggio Nord e Sud.</div>
+                <div class="slot-cta">📷 Tocca per scattare</div>
+                <div class="photo-preview" id="previewO"></div>
+              </div>
+
+            </div>
+            <div class="photo-count" id="photoCountA"></div>
+          </div>
+
+          <div class="step-error" id="errStep3A">Carica almeno 3 foto (Nord, Est, Sud) per procedere.</div>
+
+          <div class="btn-row">
+            <button class="btn btn-ghost btn-back" onclick="goToStep(2)">← Indietro</button>
+            <button class="btn btn-primary" onclick="updateRecap();goToStep(4)">Avanti →</button>
+          </div>
+        </div>
+
+        <!-- ---------- VARIANTE B: misure manuali + foto ---------- -->
+        <div id="modeDenseCard" class="hidden">
+
+          <!-- B1 — Chioma -->
+          <div class="card">
+            <div class="card-section-title">B1 · Chioma</div>
+
+            <!-- (22/09/2026) Al posto della foto dal basso: la densità la sceglie
+                 l'arborista. Nessun pulsante preselezionato. -->
+            <div class="sub-block">
+              <p class="block-label">🌳 Densità della chioma</p>
+              <p class="block-help">Mettiti sotto la chioma, vicino al fusto, e guarda il cielo attraverso i rami.</p>
+              <div class="incl-toggle">
+                <button type="button" class="toggle-btn" id="btnDensRada" onclick="selectDensita('rada')">
+                  <div class="tg-icon">☀️</div>
+                  <div class="tg-title">Rada</div>
+                  <div class="tg-sub">si vede molto cielo</div>
+                </button>
+                <button type="button" class="toggle-btn" id="btnDensMedia" onclick="selectDensita('media')">
+                  <div class="tg-icon">⛅</div>
+                  <div class="tg-title">Media</div>
+                  <div class="tg-sub">cielo e foglie a metà</div>
+                </button>
+                <button type="button" class="toggle-btn" id="btnDensDensa" onclick="selectDensita('densa')">
+                  <div class="tg-icon">🌳</div>
+                  <div class="tg-title">Densa</div>
+                  <div class="tg-sub">si vede poco cielo</div>
+                </button>
+              </div>
+              <p class="block-help" id="hintDensita">Scegli una delle tre: serve per poter analizzare.</p>
+            </div>
+
+            <div class="sub-block">
+              <p class="block-label">📐 Misure manuali — raggi chioma <span class="opt" style="font-weight:400;color:var(--ink-faint);font-size:13px;">(metri)</span></p>
+              <p class="block-help">Distanza dal fusto fino al bordo esterno della chioma, in ciascuna direzione.</p>
+              <div class="radii-grid">
+                <div class="field">
+                  <label class="lbl" for="ragNord">Raggio Nord</label>
+                  <div class="input-suffix"><input type="number" id="ragNord" inputmode="decimal" min="0" step="0.1" value="0"><span class="suffix">m</span></div>
+                </div>
+                <div class="field">
+                  <label class="lbl" for="ragSud">Raggio Sud</label>
+                  <div class="input-suffix"><input type="number" id="ragSud" inputmode="decimal" min="0" step="0.1" value="0"><span class="suffix">m</span></div>
+                </div>
+                <div class="field">
+                  <label class="lbl" for="ragEst">Raggio Est</label>
+                  <div class="input-suffix"><input type="number" id="ragEst" inputmode="decimal" min="0" step="0.1" value="0"><span class="suffix">m</span></div>
+                </div>
+                <div class="field">
+                  <label class="lbl" for="ragOvest">Raggio Ovest</label>
+                  <div class="input-suffix"><input type="number" id="ragOvest" inputmode="decimal" min="0" step="0.1" value="0"><span class="suffix">m</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="sub-block">
+              <p class="block-label">📏 Altezza albero <span class="req-star">*</span></p>
+              <p class="block-help">Conta i piani di rami (ogni piano ≈ 2–3 m).</p>
+              <div class="input-suffix"><input type="number" id="altezzaManuale" inputmode="decimal" min="0" step="0.1" placeholder="es. 12"><span class="suffix">m</span></div>
+              <div class="hint" id="hintAlt">Campo obbligatorio</div>
+            </div>
+
+            <div class="sub-block">
+              <p class="block-label">Altezza inserzione chioma <span class="opt" style="font-weight:400;color:var(--ink-faint);font-size:13px;">— opzionale</span></p>
+              <p class="block-help">Dove compaiono i primi rami dal suolo.</p>
+              <div class="input-suffix"><input type="number" id="inserzioneManuale" inputmode="decimal" min="0" step="0.1" placeholder="es. 3"><span class="suffix">m</span></div>
+            </div>
+
+            <div class="sub-block">
+              <p class="block-label">🌿 Forma della chioma <span class="opt" style="font-weight:400;color:var(--ink-faint);font-size:13px;">— opzionale</span></p>
+              <p class="block-help">Stima visiva dall'interno. La foto dal basso aiuterà l'AI a raffinare la valutazione.</p>
+              <select id="formaChiomaDense">
+                <option value="">— Scegli se visibile —</option>
+                <option value="sferica">Sferica / arrotondata</option>
+                <option value="espansa">Espansa / ombrello</option>
+                <option value="colonnare">Colonnare / piramidale</option>
+                <option value="irregolare">Irregolare / asimmetrica</option>
+                <option value="piangente">Piangente</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- B2 — Inclinazione -->
+          <div class="card" id="modeDenseInclCard">
+            <div class="card-section-title">B2 · Inclinazione strutturale</div>
+            <p class="block-label" style="margin-bottom:14px;">Il fusto è inclinato?</p>
+
+            <div class="incl-toggle">
+              <button class="toggle-btn" id="btnInclStima" onclick="selectInclMode('stima')">
+                <div class="tg-icon">👁️</div>
+                <div class="tg-title">Stima visiva</div>
+                <div class="tg-sub">rapido</div>
+              </button>
+              <button class="toggle-btn" id="btnInclFoto" onclick="selectInclMode('foto')">
+                <div class="tg-icon">📷</div>
+                <div class="tg-title">Foto del fusto</div>
+                <div class="tg-sub">più preciso</div>
+              </button>
+            </div>
+
+            <!-- Stima visiva -->
+            <div id="inclStimaSection" class="hidden">
+              <div class="field">
+                <label class="lbl" for="inclStimaGradi">Inclinazione stimata</label>
+                <select id="inclStimaGradi">
+                  <option value="0">Dritto — 0°</option>
+                  <option value="3">Lievemente inclinato — 3°</option>
+                  <option value="7">Inclinazione moderata — 7°</option>
+                  <option value="12">Evidente — 12°</option>
+                  <option value="20">Fortemente inclinato — 20°</option>
+                </select>
+              </div>
+              <div class="field hidden" id="inclStimaDir">
+                <label class="lbl" for="inclStimaDirGradi">Direzione inclinazione</label>
+                <p class="help">Gradi bussola verso cui pende la cima (0 = Nord, 90 = Est, 180 = Sud, 270 = Ovest).</p>
+                <div class="input-suffix"><input type="number" id="inclStimaDirGradi" inputmode="numeric" min="0" max="359" step="1" placeholder="es. 135"><span class="suffix">°</span></div>
+              </div>
+            </div>
+
+            <!-- Foto del fusto -->
+            <div id="inclFotoSection" class="hidden">
+              <div class="callout">
+                <span class="co-icon">🪵</span>
+                <div>Inquadra <strong>solo il fusto</strong> (non serve la chioma) da almeno 2 direzioni. Minimo 2 foto.</div>
+              </div>
+              <div class="slot-grid">
+                <div class="photo-slot" id="zoneInclN" onclick="if(!event.target.closest('.remove-btn'))document.getElementById('fileInclN').click()">
+                  <input type="file" id="fileInclN" accept="image/*" capture="environment" hidden>
+                  <div class="slot-dir">Fusto da Nord ⬆️</div>
+                  <div class="slot-desc">Sei a Nord, inquadra il fusto.</div>
+                  <div class="slot-cta">📷 Tocca per scattare</div>
+                  <div class="photo-preview" id="previewInclN"></div>
+                </div>
+                <div class="photo-slot" id="zoneInclE" onclick="if(!event.target.closest('.remove-btn'))document.getElementById('fileInclE').click()">
+                  <input type="file" id="fileInclE" accept="image/*" capture="environment" hidden>
+                  <div class="slot-dir">Fusto da Est ➡️</div>
+                  <div class="slot-desc">Sei a Est, inquadra il fusto.</div>
+                  <div class="slot-cta">📷 Tocca per scattare</div>
+                  <div class="photo-preview" id="previewInclE"></div>
+                </div>
+                <div class="photo-slot" id="zoneInclS" onclick="if(!event.target.closest('.remove-btn'))document.getElementById('fileInclS').click()">
+                  <input type="file" id="fileInclS" accept="image/*" capture="environment" hidden>
+                  <div class="slot-dir">Fusto da Sud ⬇️</div>
+                  <div class="slot-desc">Sei a Sud, inquadra il fusto.</div>
+                  <div class="slot-cta">📷 Tocca per scattare</div>
+                  <div class="photo-preview" id="previewInclS"></div>
+                </div>
+                <div class="photo-slot" id="zoneInclO" onclick="if(!event.target.closest('.remove-btn'))document.getElementById('fileInclO').click()">
+                  <input type="file" id="fileInclO" accept="image/*" capture="environment" hidden>
+                  <div class="slot-dir">Fusto da Ovest ⬅️</div>
+                  <div class="slot-desc">Sei a Ovest, inquadra il fusto.</div>
+                  <div class="slot-cta">📷 Tocca per scattare</div>
+                  <div class="photo-preview" id="previewInclO"></div>
+                </div>
+              </div>
+              <div class="photo-count" id="photoCountIncl"></div>
+            </div>
+          </div>
+
+          <div class="step-error" id="errStep3B">Inserisci l'altezza dell'albero per procedere.</div>
+
+          <div class="btn-row">
+            <button class="btn btn-ghost btn-back" onclick="goToStep(2)">← Indietro</button>
+            <button class="btn btn-primary" onclick="updateRecap();goToStep(4)">Avanti →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===================== STEP 4 ===================== -->
+      <div class="step hidden" id="step4" data-screen-label="Step 4 — Analisi">
+        <div class="step-head">
+          <p class="step-kicker">Passo 4 di 4</p>
+          <h2 class="step-title">Analisi</h2>
+          <p class="step-sub">Controlla il riepilogo e avvia l'analisi AI.</p>
+        </div>
+
+        <div class="recap">
+          <div class="recap-row"><span class="rk">Codice / Nome</span><span class="rv empty" id="recapCode">—</span></div>
+          <div class="recap-row"><span class="rk">Fusto (circ. → Ø)</span><span class="rv empty" id="recapDbh">—</span></div>
+          <div class="recap-row"><span class="rk">Posizione GPS</span><span class="rv empty" id="recapGps">—</span></div>
+          <div class="recap-row"><span class="rk">Sensori</span><span class="rv empty" id="recapSensori">—</span></div>
+          <div class="recap-row"><span class="rk">Tipo tronco</span><span class="rv empty" id="recapTronco">—</span></div>
+          <div class="recap-row"><span class="rk">Valutazione</span><span class="rv empty" id="recapSalute">—</span></div>
+          <div class="recap-row"><span class="rk">Modalità</span><span class="rv empty" id="recapMode">—</span></div>
+          <div class="recap-row"><span class="rk">Foto caricate</span><span class="rv empty" id="recapPhotos">—</span></div>
+        </div>
+
+        <button class="btn btn-analyze" id="analyzeBtn" onclick="analyzeTree()">🔍 Analizza albero</button>
+
+        <div class="error-box" id="errorBox"></div>
+
+        <div class="ai-diag">
+          <button type="button" class="ai-diag-btn" id="btnVerificaAI" onclick="verificaAI()">🩺 Verifica AI</button>
+          <div class="ai-diag-status" id="aiDiagStatus"></div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-ghost btn-back" onclick="goToStep(3)">← Torna indietro</button>
+        </div>
+      </div>
+
+    </section><!-- /formSection -->
+
+    <!-- ============================================================ -->
+    <!-- LOADING -->
+    <!-- ============================================================ -->
+    <section class="loading" id="loadingSection">
+      <div class="spinner"></div>
+      <div class="loading-title">Analisi in corso</div>
+      <div class="loading-text" id="loadingText">Preparazione…</div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- RISULTATI -->
+    <!-- ============================================================ -->
+    <section class="results" id="resultsSection" data-screen-label="Risultati">
+      <div class="results-head">
+        <div class="rh-check">✅</div>
+        <h2>Analisi completata</h2>
+        <div class="badges">
+          <span class="badge mode-badge" id="modeBadge">—</span>
+          <span class="badge confidence-badge confidence-low" id="confidenceBadge">—</span>
+        </div>
+      </div>
+
+      <div class="metrics-grid" id="metricsGrid"></div>
+
+      <div class="soglia-box" id="sogliaBox">
+        <div class="sb-label">Soglia tilt consigliata</div>
+        <div class="soglia-value" id="sogliaValue">—</div>
+        <div class="soglia-desc" id="sogliaDesc"></div>
+      </div>
+
+      <div class="incl-warn" id="inclWarnBox"></div>
+
+      <div class="ai-note" id="aiNote"></div>
+
+      <div class="results-actions">
+        <button class="btn btn-ghost" onclick="toggleReport()">📋 Mostra report</button>
+
+        <div class="report-box" id="copyReportBox">
+          <textarea id="reportText" readonly></textarea>
+          <button class="btn btn-primary copy-btn" id="copyBtn" onclick="copyReport()">Copia tutto</button>
+        </div>
+
+        <button class="btn btn-primary" id="btnCsv" onclick="generaReportZip()">📦 Prepara report (CSV + foto)</button>
+        <button class="btn btn-primary" id="btnDocx" onclick="generaDocxReport()">📝 Prepara report Word</button>
+        <div class="send-status" id="csvStatus"></div>
+        <div class="file-pronto" id="prontiZip"></div>
+        <div class="file-pronto" id="prontiDocx"></div>
+
+        <button class="btn btn-primary" id="btnInvia" onclick="inviaAlFoglio()">📤 Invia al foglio</button>
+        <div class="send-status" id="sendStatus"></div>
+
+        <div class="webapp-config" id="webappConfig">
+          <button type="button" class="webapp-config-toggle" id="webappConfigToggle" onclick="toggleWebappConfig()">⚙️ Configura foglio Google</button>
+          <div class="webapp-config-body hidden" id="webappConfigBody">
+            <label class="lbl" for="webappUrlInput">URL Web App (Google Apps Script)</label>
+            <p class="help">In Apps Script: <strong>Deploy → Nuovo deployment → Web app</strong>, imposta <strong>“Chi ha accesso: Tutti”</strong> e incolla qui l'URL che termina con <code>/exec</code>. Viene salvato su questo dispositivo.</p>
+            <input type="text" id="webappUrlInput" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off" spellcheck="false">
+            <button type="button" class="btn btn-primary" style="margin-top:12px;" onclick="saveWebappUrl()">Salva URL</button>
+            <div class="webapp-config-status" id="webappConfigStatus"></div>
+          </div>
+        </div>
+
+        <button class="btn btn-ghost" onclick="resetForm()">↩ Analizza un altro albero</button>
+      </div>
+    </section>
+
+    <p class="footnote">Valori stimati da foto e misure sul campo. Verificare altezza e larghezza chioma prima dell'uso in produzione.</p>
+
+  </main>
+</div>
+
+<!-- Supplementary wiring (does NOT touch the analysis logic) -->
+<script>
+  // Sincronizza select specie → campo Cd numerico
+  function aggiornaCD(val){
+    var inp = document.getElementById('cdSpecie');
+    if (val && inp) inp.value = val;
+  }
+
+  function updateRecap(){
+    var code = document.getElementById('treeCode').value.trim();
+    var dbh  = document.getElementById('dbh').value.trim();
+    var modeBtnA = document.getElementById('btnModeIsolated').classList.contains('selected');
+    var rc = document.getElementById('recapCode');
+    var rd = document.getElementById('recapDbh');
+    var rm = document.getElementById('recapMode');
+    var rp = document.getElementById('recapPhotos');
+
+    rc.textContent = code || 'N/D';
+    rc.classList.toggle('empty', !code);
+
+    var dbhCirc = parseFloat(dbh);
+    if (dbh && !isNaN(dbhCirc) && dbhCirc > 0){
+      var diam = dbhCirc / Math.PI;
+      rd.textContent = dbhCirc + ' cm circ. → Ø ' + diam.toFixed(1) + ' cm';
+      rd.classList.remove('empty');
+    } else {
+      rd.textContent = '—';
+      rd.classList.add('empty');
+    }
+
+    // GPS (lat/lng dai campi visibili)
+    var rg = document.getElementById('recapGps');
+    var latTxt = document.getElementById('gpsLat').textContent.trim();
+    var lngTxt = document.getElementById('gpsLng').textContent.trim();
+    var hasGps = latTxt && latTxt !== '—' && lngTxt && lngTxt !== '—';
+    rg.textContent = hasGps ? latTxt + ', ' + lngTxt : 'Non rilevata';
+    rg.classList.toggle('empty', !hasGps);
+
+    // Sensori (conta le card renderizzate)
+    var rs = document.getElementById('recapSensori');
+    var nSens = document.querySelectorAll('#sensoriList .sensor-card').length;
+    rs.textContent = nSens > 0 ? nSens + (nSens === 1 ? ' sensore' : ' sensori') : 'Nessuno';
+    rs.classList.toggle('empty', nSens === 0);
+
+    // Tipo tronco
+    var tf = document.getElementById('tipoFusto').value;
+    var tfLabel = { legnoso:'Legnoso (maturo)', giovane:'Giovane', fibroso:'Fibroso' }[tf] || '—';
+    var rtr = document.getElementById('recapTronco');
+    rtr.textContent = tfLabel;
+    rtr.classList.toggle('empty', !tf);
+
+    // Valutazione agronomo
+    var se = document.getElementById('saluteEsito').value;
+    var nord = document.getElementById('sensoreNord').checked;
+    var seLabel = se === 'sano' ? 'Albero sano' : (se === 'anomalie' ? 'Anomalie rilevate' : 'Da completare');
+    if (se) seLabel += nord ? ' · Nord ✓' : ' · Nord ✗';
+    var rsl = document.getElementById('recapSalute');
+    rsl.textContent = seLabel;
+    rsl.classList.toggle('empty', !se);
+
+    var nPhotos = 0, modeLabel = '—', modeEmpty = true;
+    if (modeBtnA){
+      modeLabel = 'A · Chioma libera';
+      modeEmpty = false;
+      ['fileN','fileE','fileS','fileO'].forEach(function(id){
+        var prev = document.getElementById('preview'+id.slice(4));
+        if (prev && prev.classList.contains('active')) nPhotos++;
+      });
+    } else if (document.getElementById('btnModeDense').classList.contains('selected')){
+      modeLabel = 'B · Chiome sovrapposte';
+      modeEmpty = false;
+      var grid = document.getElementById('previewGridB');
+      nPhotos += grid ? grid.children.length : 0;
+      ['InclN','InclE','InclS','InclO'].forEach(function(s){
+        var prev = document.getElementById('preview'+s);
+        if (prev && prev.classList.contains('active')) nPhotos++;
+      });
+    }
+    rm.textContent = modeLabel;
+    rm.classList.toggle('empty', modeEmpty);
+    rp.textContent = nPhotos > 0 ? String(nPhotos) : '0';
+    rp.classList.toggle('empty', nPhotos === 0);
+  }
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
+<!-- ===== Logica di analisi (intatta) ===== -->
+<script src="chioma-regola.js"></script>
+<script src="analisi-albero-logic.js"></script>
+
+<!-- ===== Raccordo invio al foglio (dopo la logica: legge lastResult/gpsData/sensori) ===== -->
+<script>
+  // ⚠️ URL di default della Web App di Google Apps Script (deploy → Web app).
+  // Puoi anche configurarlo dall'interfaccia (⚙️ Configura foglio Google),
+  // così resta salvato sul dispositivo senza modificare il file.
+  const WEBAPP_URL_DEFAULT = "";
+  const WEBAPP_URL_KEY = "analisi_albero_webapp_url";
+
+  function getWebAppUrl(){
+    var saved = "";
+    try { saved = (localStorage.getItem(WEBAPP_URL_KEY) || "").trim(); } catch(e){}
+    return saved || WEBAPP_URL_DEFAULT;
+  }
+
+  function toggleWebappConfig(){
+    var body = document.getElementById('webappConfigBody');
+    var toggle = document.getElementById('webappConfigToggle');
+    var open = body.classList.toggle('hidden');
+    // populate field with current value when opening
+    if (!open){
+      document.getElementById('webappUrlInput').value = getWebAppUrl();
+    }
+    toggle.textContent = (open ? '⚙️ Configura foglio Google' : '✕ Chiudi configurazione');
+    refreshWebappConfigState();
+  }
+
+  function saveWebappUrl(){
+    var input = document.getElementById('webappUrlInput');
+    var status = document.getElementById('webappConfigStatus');
+    var url = (input.value || '').trim();
+    function setStatus(cls, msg){ status.className = 'webapp-config-status ' + cls; status.textContent = msg; }
+
+    if (!url){
+      try { localStorage.removeItem(WEBAPP_URL_KEY); } catch(e){}
+      setStatus('err', 'URL rimosso. Inserisci un URL valido per abilitare l’invio.');
+      refreshWebappConfigState();
+      return;
+    }
+    if (!/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec\/?$/.test(url)){
+      setStatus('err', '⚠️ URL non valido. Deve iniziare con https://script.google.com/macros/s/ e terminare con /exec.');
+      return;
+    }
+    try { localStorage.setItem(WEBAPP_URL_KEY, url); } catch(e){}
+    setStatus('ok', '✓ URL salvato. Ora puoi inviare i dati al foglio.');
+    refreshWebappConfigState();
+  }
+
+  function refreshWebappConfigState(){
+    var toggle = document.getElementById('webappConfigToggle');
+    if (!toggle) return;
+    var configured = !!getWebAppUrl();
+    var open = !document.getElementById('webappConfigBody').classList.contains('hidden');
+    toggle.classList.toggle('configured', configured);
+    if (!open){
+      toggle.textContent = configured ? '⚙️ Foglio Google configurato ✓' : '⚙️ Configura foglio Google';
+    }
+  }
+
+  function _capFirst(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  function selectTipoFusto(v){
+    document.getElementById('tipoFusto').value = v;
+    ['legnoso','giovane','fibroso'].forEach(function(k){
+      document.getElementById('btnTronco' + _capFirst(k)).classList.toggle('selected', k === v);
+    });
+    document.getElementById('tipoFustoWarn').classList.toggle('visible', v === 'giovane' || v === 'fibroso');
+  }
+
+  function selectSalute(v){
+    document.getElementById('saluteEsito').value = v;
+    document.getElementById('btnSaluteSano').classList.toggle('selected', v === 'sano');
+    document.getElementById('btnSaluteAnomalie').classList.toggle('selected', v === 'anomalie');
+    var anom = v === 'anomalie';
+    document.getElementById('saluteWarn').classList.toggle('visible', anom);
+    document.getElementById('saluteNoteOpt').textContent = anom ? '— consigliato' : '— opzionale';
+    if (typeof showStepError === 'function') showStepError('errSalute', false);
+  }
+
+  function _num(v){ var n = parseFloat(v); return isNaN(n) ? '' : n; }
+
+  // Costruisce il pacchetto JSON atteso da doPostRilievo (Apps Script).
+  // Legge i valori stimati dall'AI (lastResult) e lo stato del form.
+  function buildRilievoPayload(){
+    var r = (typeof lastResult !== 'undefined' && lastResult) ? lastResult : {};
+    var raggi = r.raggi || {};
+    function rag(dir, manualId){
+      if (raggi[dir] != null) return raggi[dir];
+      var el = document.getElementById(manualId);
+      return el ? _num(el.value) : '';
+    }
+    var gps = (typeof gpsData !== 'undefined' && gpsData) ? gpsData : { lat:'', lng:'', acc:'' };
+    var sens = (typeof sensori !== 'undefined' && sensori) ? sensori.map(function(s){ return s.deveui; }) : [];
+    var metodo = r.metodo === 'misure_manuali' ? 'misure_manuali' : (r.metodo ? 'foto_orientate' : '');
+    var altManual = document.getElementById('altezzaManuale');
+    var insManual = document.getElementById('inserzioneManuale');
+
+    return {
+      tipo: 'rilievo_albero',
+      tree_id: document.getElementById('treeCode').value.trim(),
+      specie: document.getElementById('treeSpecies').value.trim(),
+      tipo_terreno: document.getElementById('soilType').value,
+      lat: gps.lat != null ? gps.lat : '',
+      lng: gps.lng != null ? gps.lng : '',
+      gps_accuracy_m: gps.acc != null ? gps.acc : '',
+      circonferenza_cm: _num(document.getElementById('dbh').value),
+      dbh_cm: (function(){
+        // Il campo #dbh contiene la circonferenza: il DBH è circonferenza / π
+        var c = parseFloat(document.getElementById('dbh').value);
+        return (!isNaN(c) && c > 0) ? Math.round((c / Math.PI) * 10) / 10 : '';
+      })(),
+      altezza_totale_m: (r.altezza_totale_m != null) ? r.altezza_totale_m : (altManual ? _num(altManual.value) : ''),
+      altezza_inserzione_m: (r.altezza_inserzione_chioma_m != null) ? r.altezza_inserzione_chioma_m : (insManual ? _num(insManual.value) : ''),
+      raggio_nord_m: rag('N','ragNord'),
+      raggio_est_m:  rag('E','ragEst'),
+      raggio_sud_m:  rag('S','ragSud'),
+      raggio_ovest_m: rag('O','ragOvest'),
+      densita_visiva: r.densita_visiva || '',
+      inclinazione_strutturale_gradi: (r.inclinazione_strutturale_gradi != null) ? r.inclinazione_strutturale_gradi : 0,
+      direzione_inclinazione_gradi: (r.direzione_inclinazione_gradi != null) ? r.direzione_inclinazione_gradi : 0,
+      metodo_rilievo: metodo,
+      confidenza_ai: r.confidence || '',
+      sensori: sens,
+      // ——— campi nuovi v0.4 ———
+      tipo_fusto: document.getElementById('tipoFusto').value,
+      salute_esito: document.getElementById('saluteEsito').value,
+      salute_agronomo: document.getElementById('saluteAgronomo').value.trim(),
+      salute_data: document.getElementById('saluteData').value,
+      salute_note: document.getElementById('saluteNote').value.trim(),
+      sensore_nord: document.getElementById('sensoreNord').checked,
+      // ——— campi v0.5: forma e aerodinamica ———
+      forma_chioma: (function(){
+        // Modalità A: dal select di Step 1; Modalità B: dal select dedicato o dall'AI
+        var dense = document.getElementById('formaChiomaDense');
+        if (dense && dense.value) return dense.value;
+        return document.getElementById('formaChioma').value;
+      })(),
+      simmetria_chioma: r.simmetria_chioma || '',
+      cd_specie: (function(){
+        var v = document.getElementById('cdSpecie').value;
+        return v ? parseFloat(v) : (r.cd_specie || '');
+      })()
+    };
+  }
+
+  async function inviaAlFoglio(){
+    var status = document.getElementById('sendStatus');
+    function set(cls, msg){ status.className = 'send-status ' + cls; status.textContent = msg; }
+
+    // Validazione obbligatoria prima dell'invio
+    var tipoFusto  = document.getElementById('tipoFusto').value;
+    var saluteEsito = document.getElementById('saluteEsito').value;
+    var nord = document.getElementById('sensoreNord').checked;
+    document.getElementById('nordRow').classList.toggle('required-missing', !nord);
+
+    var manca = [];
+    if (!tipoFusto)   manca.push('tipo di tronco');
+    if (!saluteEsito) manca.push('esito valutazione agronomo');
+    if (!nord)        manca.push('conferma orientamento Nord');
+    if (manca.length){
+      set('err', '⚠️ Completa prima di inviare: ' + manca.join(', ') + '.');
+      return;
+    }
+
+    var payload = buildRilievoPayload();
+
+    var webappUrl = getWebAppUrl();
+    if (!webappUrl){
+      set('err', '⚠️ Nessun foglio Google collegato. Tocca "⚙️ Configura foglio Google" qui sotto e incolla l’URL della Web App per abilitare l’invio. Intanto i dati sono pronti nel report ("Copia tutto").');
+      var cfg = document.getElementById('webappConfigBody');
+      if (cfg && cfg.classList.contains('hidden')) toggleWebappConfig();
+      document.getElementById('webappConfig').scrollIntoView({behavior:'smooth',block:'center'});
+      return;
+    }
+
+    set('loading', '⏳ Invio al foglio in corso…');
+    try {
+      var resp = await fetch(webappUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // text/plain: evita il preflight CORS
+        body: JSON.stringify(payload)
+      });
+      var txt = await resp.text();
+      if (/^ERR/i.test(txt)) throw new Error(txt);
+      set('ok', '✓ Inviato al foglio.' + (txt && txt.indexOf('{') === -1 ? ' ' + txt : ''));
+    } catch(e){
+      set('err', '❌ Invio non riuscito: ' + (e && e.message ? e.message : e) + '. I dati restano nel report — usa “Copia tutto”.');
+    }
+  }
+
+  // Default data odierna + estensione del reset (senza toccare la logica)
+  (function(){
+    // Pulisci gli errori obbligatori quando l'utente li completa
+    var nordChk = document.getElementById('sensoreNord');
+    if (nordChk){
+      nordChk.addEventListener('change', function(){
+        if (this.checked){
+          document.getElementById('nordRow').classList.remove('required-missing');
+          if (typeof showStepError === 'function') showStepError('errNord', false);
+        }
+      });
+    }
+
+    var d = document.getElementById('saluteData');
+    if (d && !d.value) d.value = new Date().toISOString().slice(0,10);
+
+    // Precompila un sensore fittizio al primo caricamento, così le prove
+    // non richiedono di inserire un DevEUI ogni volta (step 2 già sbloccato).
+    // Basta toccare ✕ sulla card per rimuoverlo, oppure aggiungerne uno vero
+    // con "➕ Aggiungi sensore": lo sostituisce automaticamente.
+    if (typeof aggiungiSensoreFittizioSeVuoto === 'function') aggiungiSensoreFittizioSeVuoto();
+
+    // Stato iniziale config foglio Google
+    var urlInput = document.getElementById('webappUrlInput');
+    if (urlInput) urlInput.value = getWebAppUrl();
+    refreshWebappConfigState();
+
+    if (typeof resetForm === 'function'){
+      var _origReset = resetForm;
+      window.resetForm = function(){
+        _origReset();
+        selectTipoFusto('legnoso');
+        document.getElementById('saluteEsito').value = '';
+        document.getElementById('btnSaluteSano').classList.remove('selected');
+        document.getElementById('btnSaluteAnomalie').classList.remove('selected');
+        document.getElementById('saluteWarn').classList.remove('visible');
+        document.getElementById('saluteAgronomo').value = '';
+        document.getElementById('saluteNote').value = '';
+        document.getElementById('saluteNoteOpt').textContent = '— opzionale';
+        var dd = document.getElementById('saluteData');
+        if (dd) dd.value = new Date().toISOString().slice(0,10);
+        document.getElementById('sensoreNord').checked = false;
+        document.getElementById('nordRow').classList.remove('required-missing');
+        var ss = document.getElementById('sendStatus');
+        if (ss){ ss.className = 'send-status'; ss.textContent = ''; }
+        // Ripristina il sensore fittizio di default dopo il reset
+        if (typeof aggiungiSensoreFittizioSeVuoto === 'function') aggiungiSensoreFittizioSeVuoto();
+      };
+    }
+  })();
+</script>
+<script src="accesso.js"></script>
+<script src="codice-parco-prefisso.js"></script>
+<script src="arete-vra-logic.js"></script>
+<script src="dual-write-supabase.js"></script>
+<script src="vra-sospendi.js"></script>
+<script src="vra-bersaglio-guard.js"></script>
+<script src="archivio-foto.js"></script>
+<script src="foto-report.js"></script>
+<script src="codice-albero-guard.js"></script>
+</body>
+</html>
