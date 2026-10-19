@@ -5,9 +5,11 @@
 // Vedere design-brief.md per la lista completa degli ID obbligatori.
 
 let selectedMode = null;
-  let inclMode = null;
   let orientedFiles = { N: null, E: null, S: null, O: null };
-  let inclFotoFiles = { N: null, E: null, S: null, O: null };
+  // (19/10/2026) Documentazione fotografica: fino a 4 foto facoltative, indipendenti dalla
+  // modalità. Non entrano nei calcoli e non vanno all'IA. Sostituisce le «foto del fusto» per
+  // l'inclinazione (tolte): in modalità B l'inclinazione viene solo dalla stima visiva.
+  let docFotoFiles = { 1: null, 2: null, 3: null, 4: null };
   // (22/09/2026) La foto dal basso è stata tolta. La densità della chioma la
   // sceglie l'arborista con tre pulsanti, senza niente di preselezionato:
   // finché non sceglie, Analizza resta spento. Prima, senza foto, il form
@@ -445,19 +447,11 @@ let selectedMode = null;
     document.getElementById('modeIsolatedCard').classList.toggle('hidden', mode !== 'isolated');
     document.getElementById('modeDenseCard').classList.toggle('hidden', mode !== 'dense');
     document.getElementById('modeDenseInclCard').classList.toggle('hidden', mode !== 'dense');
+    posizionaDocFoto();
     document.getElementById('analyzeBtn').classList.remove('hidden');
     updateAnalyzeBtn();
     // Auto-advance to step 3
     goToStep(3);
-  }
-
-  function selectInclMode(mode) {
-    inclMode = mode;
-    document.getElementById('btnInclStima').classList.toggle('selected', mode === 'stima');
-    document.getElementById('btnInclFoto').classList.toggle('selected', mode === 'foto');
-    document.getElementById('inclStimaSection').classList.toggle('hidden', mode !== 'stima');
-    document.getElementById('inclFotoSection').classList.toggle('hidden', mode !== 'foto');
-    updateAnalyzeBtn();
   }
 
   // Show direction field when inclination > 0
@@ -466,55 +460,70 @@ let selectedMode = null;
     document.getElementById('inclStimaDir').classList.toggle('hidden', val === 0);
   });
 
-  // Setup inclination photo slots
-  ['N','E','S','O'].forEach(dir => {
-    const input = document.getElementById('fileIncl' + dir);
-    const zone  = document.getElementById('zoneIncl' + dir);
-    const preview = document.getElementById('previewIncl' + dir);
+  // --- DOCUMENTAZIONE FOTOGRAFICA (19/10/2026) ---------------------------
+  // Quattro caselle facoltative, uguali in modalità A e B. Nessun minimo, nessuna analisi,
+  // nessuna chiamata all'IA: le foto restano nel form e vanno solo nel report e in archivio.
+  const DOC_FOTO_ETICHETTA = 'Documentazione fotografica';
+  const DOC_FOTO_NOTA = 'Non rientra nei calcoli e non è stata inviata all\u2019IA.';
+
+  [1, 2, 3, 4].forEach(i => {
+    const input = document.getElementById('fileDoc' + i);
+    const zone  = document.getElementById('zoneDoc' + i);
     zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
     zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
     zone.addEventListener('drop', e => {
       e.preventDefault(); zone.classList.remove('drag-over');
       const f = Array.from(e.dataTransfer.files).find(f => f.type.startsWith('image/'));
-      if (f) setInclFile(dir, f);
+      if (f) setDocFile(i, f);
     });
     input.addEventListener('change', () => {
-      if (input.files[0]) setInclFile(dir, input.files[0]);
+      if (input.files[0]) setDocFile(i, input.files[0]);
       input.value = '';
     });
   });
 
-  function setInclFile(dir, file) {
-    inclFotoFiles[dir] = file;
-    const zone = document.getElementById('zoneIncl' + dir);
-    const preview = document.getElementById('previewIncl' + dir);
+  function setDocFile(i, file) {
+    docFotoFiles[i] = file;
+    const zone = document.getElementById('zoneDoc' + i);
+    const preview = document.getElementById('previewDoc' + i);
     zone.classList.add('filled');
     const reader = new FileReader();
     reader.onload = e => {
       preview.classList.add('active');
-      preview.innerHTML = `<img src="${e.target.result}"><button class="remove-btn" onclick="clearInclFile('${dir}')">✕</button>`;
+      preview.innerHTML = `<img src="${e.target.result}"><button class="remove-btn" onclick="clearDocFile(${i})">✕</button>`;
     };
     reader.readAsDataURL(file);
-    updateInclCount();
-    updateAnalyzeBtn();
+    updateDocCount();
   }
 
-  window.clearInclFile = function(dir) {
-    inclFotoFiles[dir] = null;
-    const zone = document.getElementById('zoneIncl' + dir);
-    const preview = document.getElementById('previewIncl' + dir);
+  window.clearDocFile = function(i) {
+    docFotoFiles[i] = null;
+    const zone = document.getElementById('zoneDoc' + i);
+    const preview = document.getElementById('previewDoc' + i);
     zone.classList.remove('filled');
     preview.classList.remove('active');
     preview.innerHTML = '';
-    updateInclCount();
-    updateAnalyzeBtn();
+    updateDocCount();
   };
 
-  function updateInclCount() {
-    const n = Object.values(inclFotoFiles).filter(f => f !== null).length;
-    const el = document.getElementById('photoCountIncl');
+  function updateDocCount() {
+    const n = Object.values(docFotoFiles).filter(f => f !== null).length;
+    const el = document.getElementById('photoCountDoc');
     if (!el) return;
-    el.textContent = n === 0 ? '' : n < 2 ? '1 foto — aggiungi almeno quella da Est' : `${n} foto caricate ✓`;
+    el.textContent = n === 0 ? '' : (n === 1 ? '1 foto di documentazione ✓' : n + ' foto di documentazione ✓');
+  }
+
+  // La scheda sta in un posto solo nell'HTML; qui la si porta dentro la modalità visibile,
+  // sopra i messaggi d'errore e i pulsanti. Senza modalità scelta resta nascosta.
+  function posizionaDocFoto() {
+    const card = document.getElementById('docFotoCard');
+    if (!card) return;
+    const dest = selectedMode === 'isolated' ? document.getElementById('modeIsolatedCard')
+               : selectedMode === 'dense'    ? document.getElementById('modeDenseCard') : null;
+    if (!dest) { card.classList.add('hidden'); return; }
+    const prima = dest.querySelector('.step-error') || dest.querySelector('.btn-row');
+    if (prima && prima.parentNode === dest) dest.insertBefore(card, prima); else dest.appendChild(card);
+    card.classList.remove('hidden');
   }
 
   // Step navigation
@@ -625,14 +634,9 @@ let selectedMode = null;
       const altezza = parseFloat(document.getElementById('altezzaManuale').value);
       if (!altezza || altezza <= 0) { btn.disabled = true; return; }
       if (!densitaScelta) { btn.disabled = true; return; }
-      // incl mode must be selected; if foto, need at least 2 photos
-      if (!inclMode) { btn.disabled = false; return; } // incl optional
-      if (inclMode === 'foto') {
-        const n = Object.values(inclFotoFiles).filter(f => f !== null).length;
-        btn.disabled = n < 2;
-      } else {
-        btn.disabled = false;
-      }
+      // (19/10/2026) L'inclinazione è una stima visiva facoltativa e la documentazione
+      // fotografica non ha minimi: niente più condiziona il pulsante, oltre ad altezza e densità.
+      btn.disabled = false;
     }
   }
 
@@ -1196,16 +1200,11 @@ IMPORTANTE: niente apostrofi ne virgolette nelle stringhe.`
     const formaChiomaAI = '';
     const simmetriaAI = '';
 
-    // Inclinazione strutturale modalità B
-    let inclGradi = 0, inclDir = 0;
-    if (inclMode === 'stima') {
-      inclGradi = parseFloat(document.getElementById('inclStimaGradi').value) || 0;
-      inclDir   = parseFloat(document.getElementById('inclStimaDirGradi').value) || 0;
-    } else if (inclMode === 'foto') {
-      const inclResult = await analyzeInclFoto(dbh, species);
-      inclGradi = inclResult.gradi;
-      inclDir   = inclResult.dir;
-    }
+    // Inclinazione strutturale modalità B — (19/10/2026) SOLO stima visiva. L'analisi da foto
+    // del fusto è stata tolta (perdeva le foto in silenzio e l'inclinazione risultava 0°).
+    // Se non si risponde resta quello che mostra il menu: «Dritto — 0°», come prima.
+    const inclGradi = parseFloat(document.getElementById('inclStimaGradi').value) || 0;
+    const inclDir   = parseFloat(document.getElementById('inclStimaDirGradi').value) || 0;
 
     return {
       altezza_totale_m: altezza,
@@ -1235,59 +1234,8 @@ IMPORTANTE: niente apostrofi ne virgolette nelle stringhe.`
     };
   }
 
-  // Analisi inclinazione strutturale da foto del fusto (modalità B2)
-  async function analyzeInclFoto(dbh, species) {
-    const dirs = ['N','E','S','O'];
-    const present = dirs.filter(d => inclFotoFiles[d] !== null);
-    if (present.length === 0) return { gradi: 0, dir: 0 };
-
-    const dirLabels = { N:'NORD', E:'EST', S:'SUD', O:'OVEST' };
-    let inclRaw = [], dirRaw = [];
-
-    for (const d of present) {
-      setLoading(`AI analizza fusto da ${dirLabels[d]}...`);
-      const b64 = await toBase64(inclFotoFiles[d]);
-      const mt = inclFotoFiles[d].type || 'image/jpeg';
-      const prompt = {
-        type: 'text',
-        text: `Sei un esperto di arboricoltura. Questa foto e stata scattata stando a ${dirLabels[d]} dell albero, fotografando verso il lato opposto.
-DBH fusto: ${dbh}cm. Specie: ${species}.
-COMPITO: guarda SOLO il fusto dell albero. Ignora completamente la chioma.
-Stima l angolo di inclinazione del fusto rispetto alla verticale e la direzione verso cui si inclina.
-Un fusto dritto = 0 gradi. Una inclinazione evidente = 10-15 gradi. Molto inclinato = 20-30 gradi.
-Rispondi SOLO con JSON valido:
-{
-  "inclinazione_fusto_gradi": <numero 0-45>,
-  "direzione_inclinazione_gradi": <numero 0-359, verso cui si inclina la cima, 0=Nord, 90=Est>,
-  "confidence": "<alta|media|bassa>",
-  "note": "<breve nota senza apostrofi>"
-}
-IMPORTANTE: niente apostrofi ne virgolette nelle stringhe.`
-      };
-      try {
-        const _aiTxt = await aiComplete([
-          { type: 'image', source: { type: 'base64', media_type: mt, data: b64 } },
-          prompt
-        ], 300);
-        {
-          const r = parseJSON(_aiTxt);
-          if (r.inclinazione_fusto_gradi != null) inclRaw.push(r.inclinazione_fusto_gradi);
-          if (r.direzione_inclinazione_gradi != null) dirRaw.push(r.direzione_inclinazione_gradi);
-        }
-      } catch(e) { /* continua */ }
-    }
-
-    const mediaArr = arr => arr.length > 0 ? arr.reduce((a,b)=>a+b,0)/arr.length : 0;
-    const gradi = Math.round(mediaArr(inclRaw) * 10) / 10;
-    // Media circolare direzione
-    let dir = 0;
-    if (dirRaw.length > 0) {
-      const sinS = dirRaw.reduce((s,d)=>s+Math.sin(d*Math.PI/180),0);
-      const cosS = dirRaw.reduce((s,d)=>s+Math.cos(d*Math.PI/180),0);
-      dir = Math.round(((Math.atan2(sinS,cosS)*180/Math.PI)+360)%360);
-    }
-    return { gradi, dir };
-  }
+  // (19/10/2026) analyzeInclFoto è stata tolta: in modalità B l'inclinazione viene solo dalla
+  // stima visiva. Nessuna foto del form va più all'IA tranne le orientate della modalità A.
 
   function parseJSON(text) {
     // Attempt 1: direct parse
@@ -1529,6 +1477,7 @@ IMPORTANTE: niente apostrofi ne virgolette nelle stringhe.`
       `Nome agronomo:      ${saluteAgronomo || '—'}`,
       `Data valutazione:   ${saluteData || '—'}`,
       `Note:               ${saluteNote || '—'}`,
+      ...righeDocFotoTesto(sep),
       '',
       sep,
       '⚠ Valori stimati da foto/misure manuali.',
@@ -1540,18 +1489,17 @@ IMPORTANTE: niente apostrofi ne virgolette nelle stringhe.`
   }
 
   // Raccoglie tutte le foto disponibili nel rilievo corrente, con etichetta
-  // (13/10/2026) Entrano solo le foto del modo che ha prodotto il risultato:
-  // le orientate con la chioma libera ('isolated'); quelle del fusto con la
-  // chioma sovrapposta ('dense') e solo se l'inclinazione è «da foto». Le foto
-  // rimaste in memoria da un modo lasciato non vanno nel report né in archivio.
+  // (13/10/2026) Le foto di ANALISI entrano solo se sono del modo che ha prodotto il risultato:
+  // le orientate con la chioma libera ('isolated'). Quelle rimaste in memoria da un modo
+  // lasciato non vanno nel report né in archivio.
+  // (19/10/2026) La DOCUMENTAZIONE FOTOGRAFICA (fino a 4 foto facoltative) NON dipende dalla
+  // modalità: entra sempre, in A come in B. Non entra nei calcoli né va all'IA, e il report lo dichiara.
   function usaFotoOrientate() { return selectedMode === 'isolated'; }
-  function usaFotoFusto()     { return selectedMode === 'dense' && inclMode === 'foto'; }
 
-  // Quante foto sono in memoria ma non vengono incluse (per dirlo a schermo).
+  // Quante foto di analisi sono in memoria ma non vengono incluse (per dirlo a schermo).
   function contaFotoEscluse() {
     let n = 0;
     if (!usaFotoOrientate()) ['N','E','S','O'].forEach(d => { if (orientedFiles[d]) n++; });
-    if (!usaFotoFusto())     ['N','E','S','O'].forEach(d => { if (inclFotoFiles[d]) n++; });
     return n;
   }
   function notaFotoEscluse() {
@@ -1565,10 +1513,25 @@ IMPORTANTE: niente apostrofi ne virgolette nelle stringhe.`
     if (usaFotoOrientate()) ['N','E','S','O'].forEach(dir => {
       if (orientedFiles[dir]) foto.push({ file: orientedFiles[dir], label: 'Chioma orientata — ' + dirName({N:0,E:90,S:180,O:270}[dir]) });
     });
-    if (usaFotoFusto()) ['N','E','S','O'].forEach(dir => {
-      if (inclFotoFiles[dir]) foto.push({ file: inclFotoFiles[dir], label: 'Fusto / inclinazione — ' + dirName({N:0,E:90,S:180,O:270}[dir]) });
+    [1, 2, 3, 4].forEach(i => {
+      if (docFotoFiles[i]) foto.push({ file: docFotoFiles[i], label: DOC_FOTO_ETICHETTA + ' — Foto ' + i, doc: true });
     });
     return foto;
+  }
+
+  // Una foto è «di documentazione» se lo dice la sua scheda oppure — per quelle recuperate
+  // dall'archivio, che arrivano solo con l'etichetta — se l'etichetta comincia così.
+  // Le righe che dichiarano la documentazione fotografica nel testo del report (vuote se non c'è).
+  function righeDocFotoTesto(sep) {
+    let doc = [];
+    try { doc = raccogliFotoRilievo().filter(isFotoDoc); } catch (e) { doc = []; }
+    if (!doc.length) return [];
+    return ['', 'DOCUMENTAZIONE FOTOGRAFICA', sep,
+      doc.length + (doc.length === 1 ? ' foto' : ' foto') + ' di documentazione. ' + DOC_FOTO_NOTA]
+      .concat(doc.map(f => '  • ' + f.label));
+  }
+  function isFotoDoc(f) {
+    return !!f && (f.doc === true || /^documentazione fotografica/i.test(String(f.label || '')));
   }
 
   // ─── REPORT CSV ─────────────────────────────────────────────────────
@@ -1715,7 +1678,11 @@ IMPORTANTE: niente apostrofi ne virgolette nelle stringhe.`
         const safeLabel = f.label.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
         return { ...f, zipPath: `foto/${String(i + 1).padStart(2, '0')}_${safeLabel}.jpg` };
       });
-      const fotoElenco = fotoEntries.map(f => f.zipPath).join(' | ');
+      // (19/10/2026) «foto_utilizzate» elenca SOLO le foto di analisi; la documentazione
+      // fotografica ha le sue colonne, con la dichiarazione che non entra nei calcoli.
+      const fotoElenco = fotoEntries.filter(f => !isFotoDoc(f)).map(f => f.zipPath).join(' | ');
+      const docEntries = fotoEntries.filter(isFotoDoc);
+      const docElenco = docEntries.map(f => f.zipPath).join(' | ');
 
       const campi = [
         ['data_ora_report', nowIt],
@@ -1756,6 +1723,8 @@ IMPORTANTE: niente apostrofi ne virgolette nelle stringhe.`
         ['valutazione_agronomo_data', saluteData],
         ['valutazione_agronomo_note', saluteNote],
         ['foto_utilizzate', fotoElenco || 'nessuna'],
+        ['documentazione_fotografica', docElenco || 'nessuna'],
+        ['documentazione_fotografica_nota', docEntries.length ? docEntries.length + (docEntries.length === 1 ? ' foto. ' : ' foto. ') + DOC_FOTO_NOTA : ''],
       ];
 
       if (window.vraExtra) { try { campi.push.apply(campi, window.vraExtra.csvRows()); } catch(e){} }
@@ -1950,16 +1919,17 @@ IMPORTANTE: niente apostrofi ne virgolette nelle stringhe.`
 
       if (window.vraExtra) { try { children.push.apply(children, window.vraExtra.docxChildren(docx)); } catch(e){} }
 
-      // Documentazione fotografica — foto medie (~mezza pagina)
+      // Foto del rilievo — foto medie (~mezza pagina).
+      // (19/10/2026) Due gruppi: le foto USATE NELL'ANALISI (orientate) e la DOCUMENTAZIONE
+      // FOTOGRAFICA (facoltativa), che non entra nei calcoli e non è stata inviata all'IA.
       const foto = raccogliFotoRilievo();
-      children.push(h2('Documentazione fotografica'));
+      const fotoAnalisi = foto.filter(f => !isFotoDoc(f));
+      const fotoDoc = foto.filter(isFotoDoc);
       let fotoOk = 0;
-      if (foto.length === 0) {
-        children.push(new Paragraph({ children: [ new TextRun({ text: 'Nessuna foto allegata al rilievo.', italics: true, size: 18, color: FAINT }) ] }));
-      } else {
+      const aggiungiFoto = async (elenco) => {
         // Larghezza media: ~mezza pagina utile (pagina A4 utile ~468pt → ~300px)
         const TARGET_W = 300;
-        for (const f of foto) {
+        for (const f of elenco) {
           let compresso;
           try { compresso = await comprimiImmagine(f.file, 1400, 0.75); }
           catch (e) { continue; }
@@ -1972,6 +1942,17 @@ IMPORTANTE: niente apostrofi ne virgolette nelle stringhe.`
             new ImageRun({ data: compresso.bytes, transformation: { width: w, height: h } }) ] }));
           fotoOk++;
         }
+      };
+      if (fotoAnalisi.length) {
+        children.push(h2('Foto usate nell\u2019analisi'));
+        await aggiungiFoto(fotoAnalisi);
+      }
+      children.push(h2('Documentazione fotografica'));
+      if (fotoDoc.length === 0) {
+        children.push(new Paragraph({ children: [ new TextRun({ text: fotoAnalisi.length ? 'Nessuna foto di documentazione.' : 'Nessuna foto allegata al rilievo.', italics: true, size: 18, color: FAINT }) ] }));
+      } else {
+        children.push(new Paragraph({ children: [ new TextRun({ text: DOC_FOTO_NOTA, italics: true, size: 18, color: FAINT }) ] }));
+        await aggiungiFoto(fotoDoc);
       }
 
       // Nota di cautela finale
@@ -2050,7 +2031,6 @@ IMPORTANTE: niente apostrofi ne virgolette nelle stringhe.`
     togliTuttiIFilePronti();
     document.getElementById('copyReportBox').style.display = 'none';
     selectedMode = null;
-    inclMode = null;
     gpsData = { lat: null, lng: null, acc: null };
     sensori = [];
     setGpsStatus('idle', '📍 Posizione non ancora rilevata');
@@ -2064,23 +2044,16 @@ IMPORTANTE: niente apostrofi ne virgolette nelle stringhe.`
     document.getElementById('sensoriList').querySelectorAll('.sensor-card,.sensor-input-row').forEach(e=>e.remove());
     document.getElementById('sensoriEmpty').style.display = 'block';
     stopQR();
-    ['N','E','S','O'].forEach(d => {
-      inclFotoFiles[d] = null;
-      const zi = document.getElementById('zoneIncl'+d);
-      const pi = document.getElementById('previewIncl'+d);
-      if (zi) zi.classList.remove('filled');
-      if (pi) { pi.classList.remove('active'); pi.innerHTML=''; }
+    [1, 2, 3, 4].forEach(i => {
+      docFotoFiles[i] = null;
+      const zd = document.getElementById('zoneDoc' + i);
+      const pd = document.getElementById('previewDoc' + i);
+      if (zd) zd.classList.remove('filled');
+      if (pd) { pd.classList.remove('active'); pd.innerHTML = ''; }
     });
-    const ps = document.getElementById('photoCountIncl');
-    if (ps) ps.textContent = '';
-    ['btnInclStima','btnInclFoto'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.classList.remove('selected');
-    });
-    ['inclStimaSection','inclFotoSection'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.classList.add('hidden');
-    });
+    const pcd = document.getElementById('photoCountDoc');
+    if (pcd) pcd.textContent = '';
+    posizionaDocFoto();
     const isg = document.getElementById('inclStimaGradi');
     if (isg) isg.value = '0';
     const isd = document.getElementById('inclStimaDirGradi');

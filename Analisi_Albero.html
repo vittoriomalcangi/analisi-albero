@@ -987,7 +987,7 @@
           </div>
 
           <div class="card">
-            <div class="card-section-title">📷 Foto orientate N · E · S · O</div>
+            <div class="card-section-title">📷 Foto orientate N · E · S · O — per l'analisi</div>
             <div class="slot-grid">
 
               <div class="photo-slot" id="zoneN" onclick="if(!event.target.closest('.remove-btn'))document.getElementById('fileN').click()">
@@ -1117,25 +1117,15 @@
           </div>
 
           <!-- B2 — Inclinazione -->
+          <!-- (19/10/2026) Resta la sola stima visiva: l'inclinazione dalle foto del fusto è stata
+               tolta. Le quattro foto che c'erano sono diventate la «Documentazione fotografica»,
+               che vale in entrambe le modalità (scheda docFotoCard, più in basso). Se non si
+               risponde resta «Dritto — 0°», come prima. -->
           <div class="card" id="modeDenseInclCard">
             <div class="card-section-title">B2 · Inclinazione strutturale</div>
-            <p class="block-label" style="margin-bottom:14px;">Il fusto è inclinato?</p>
+            <p class="block-label" style="margin-bottom:14px;">Il fusto è inclinato? <span class="opt" style="font-weight:400;color:var(--ink-faint);font-size:13px;">— stima visiva</span></p>
 
-            <div class="incl-toggle">
-              <button class="toggle-btn" id="btnInclStima" onclick="selectInclMode('stima')">
-                <div class="tg-icon">👁️</div>
-                <div class="tg-title">Stima visiva</div>
-                <div class="tg-sub">rapido</div>
-              </button>
-              <button class="toggle-btn" id="btnInclFoto" onclick="selectInclMode('foto')">
-                <div class="tg-icon">📷</div>
-                <div class="tg-title">Foto del fusto</div>
-                <div class="tg-sub">più preciso</div>
-              </button>
-            </div>
-
-            <!-- Stima visiva -->
-            <div id="inclStimaSection" class="hidden">
+            <div id="inclStimaSection">
               <div class="field">
                 <label class="lbl" for="inclStimaGradi">Inclinazione stimata</label>
                 <select id="inclStimaGradi">
@@ -1152,45 +1142,6 @@
                 <div class="input-suffix"><input type="number" id="inclStimaDirGradi" inputmode="numeric" min="0" max="359" step="1" placeholder="es. 135"><span class="suffix">°</span></div>
               </div>
             </div>
-
-            <!-- Foto del fusto -->
-            <div id="inclFotoSection" class="hidden">
-              <div class="callout">
-                <span class="co-icon">🪵</span>
-                <div>Inquadra <strong>solo il fusto</strong> (non serve la chioma) da almeno 2 direzioni. Minimo 2 foto.</div>
-              </div>
-              <div class="slot-grid">
-                <div class="photo-slot" id="zoneInclN" onclick="if(!event.target.closest('.remove-btn'))document.getElementById('fileInclN').click()">
-                  <input type="file" id="fileInclN" accept="image/*" capture="environment" hidden>
-                  <div class="slot-dir">Fusto da Nord ⬆️</div>
-                  <div class="slot-desc">Sei a Nord, inquadra il fusto.</div>
-                  <div class="slot-cta">📷 Tocca per scattare</div>
-                  <div class="photo-preview" id="previewInclN"></div>
-                </div>
-                <div class="photo-slot" id="zoneInclE" onclick="if(!event.target.closest('.remove-btn'))document.getElementById('fileInclE').click()">
-                  <input type="file" id="fileInclE" accept="image/*" capture="environment" hidden>
-                  <div class="slot-dir">Fusto da Est ➡️</div>
-                  <div class="slot-desc">Sei a Est, inquadra il fusto.</div>
-                  <div class="slot-cta">📷 Tocca per scattare</div>
-                  <div class="photo-preview" id="previewInclE"></div>
-                </div>
-                <div class="photo-slot" id="zoneInclS" onclick="if(!event.target.closest('.remove-btn'))document.getElementById('fileInclS').click()">
-                  <input type="file" id="fileInclS" accept="image/*" capture="environment" hidden>
-                  <div class="slot-dir">Fusto da Sud ⬇️</div>
-                  <div class="slot-desc">Sei a Sud, inquadra il fusto.</div>
-                  <div class="slot-cta">📷 Tocca per scattare</div>
-                  <div class="photo-preview" id="previewInclS"></div>
-                </div>
-                <div class="photo-slot" id="zoneInclO" onclick="if(!event.target.closest('.remove-btn'))document.getElementById('fileInclO').click()">
-                  <input type="file" id="fileInclO" accept="image/*" capture="environment" hidden>
-                  <div class="slot-dir">Fusto da Ovest ⬅️</div>
-                  <div class="slot-desc">Sei a Ovest, inquadra il fusto.</div>
-                  <div class="slot-cta">📷 Tocca per scattare</div>
-                  <div class="photo-preview" id="previewInclO"></div>
-                </div>
-              </div>
-              <div class="photo-count" id="photoCountIncl"></div>
-            </div>
           </div>
 
           <div class="step-error" id="errStep3B">Inserisci l'altezza dell'albero per procedere.</div>
@@ -1199,6 +1150,51 @@
             <button class="btn btn-ghost btn-back" onclick="goToStep(2)">← Indietro</button>
             <button class="btn btn-primary" onclick="updateRecap();goToStep(4)">Avanti →</button>
           </div>
+        </div>
+
+        <!-- ---------- DOCUMENTAZIONE FOTOGRAFICA — modalità A e B (19/10/2026) ----------
+             Fino a 4 foto FACOLTATIVE, indipendenti dalla modalità. NON entrano nei calcoli e NON
+             vanno all'IA: compaiono solo nel report e in archivio, dichiarate come tali.
+             Qui sta nascosta: posizionaDocFoto() la sposta dentro la modalità visibile, sopra i
+             messaggi d'errore e i pulsanti «Indietro / Avanti». Niente «capture»: sul telefono si
+             può scattare ma anche scegliere dalla galleria. -->
+        <div class="card hidden" id="docFotoCard">
+          <div class="card-section-title">📎 Documentazione fotografica <span class="opt-tag">facoltativa — non entra nei calcoli</span></div>
+          <div class="callout">
+            <span class="co-icon">🗂️</span>
+            <div>Fino a <strong>4 foto di documentazione</strong>, a tua scelta (un dettaglio, un difetto, la zona intorno). <strong>Non entrano nei calcoli e non vanno all'IA</strong>: compaiono solo nel report e in archivio.</div>
+          </div>
+          <div class="slot-grid">
+            <div class="photo-slot" id="zoneDoc1" onclick="if(!event.target.closest('.remove-btn'))document.getElementById('fileDoc1').click()">
+              <input type="file" id="fileDoc1" accept="image/*" hidden>
+              <div class="slot-dir">Foto 1</div>
+              <div class="slot-desc">facoltativa</div>
+              <div class="slot-cta">📷 Tocca per scattare o scegliere</div>
+              <div class="photo-preview" id="previewDoc1"></div>
+            </div>
+            <div class="photo-slot" id="zoneDoc2" onclick="if(!event.target.closest('.remove-btn'))document.getElementById('fileDoc2').click()">
+              <input type="file" id="fileDoc2" accept="image/*" hidden>
+              <div class="slot-dir">Foto 2</div>
+              <div class="slot-desc">facoltativa</div>
+              <div class="slot-cta">📷 Tocca per scattare o scegliere</div>
+              <div class="photo-preview" id="previewDoc2"></div>
+            </div>
+            <div class="photo-slot" id="zoneDoc3" onclick="if(!event.target.closest('.remove-btn'))document.getElementById('fileDoc3').click()">
+              <input type="file" id="fileDoc3" accept="image/*" hidden>
+              <div class="slot-dir">Foto 3</div>
+              <div class="slot-desc">facoltativa</div>
+              <div class="slot-cta">📷 Tocca per scattare o scegliere</div>
+              <div class="photo-preview" id="previewDoc3"></div>
+            </div>
+            <div class="photo-slot" id="zoneDoc4" onclick="if(!event.target.closest('.remove-btn'))document.getElementById('fileDoc4').click()">
+              <input type="file" id="fileDoc4" accept="image/*" hidden>
+              <div class="slot-dir">Foto 4</div>
+              <div class="slot-desc">facoltativa</div>
+              <div class="slot-cta">📷 Tocca per scattare o scegliere</div>
+              <div class="photo-preview" id="previewDoc4"></div>
+            </div>
+          </div>
+          <div class="photo-count" id="photoCountDoc"></div>
         </div>
       </div>
 
@@ -1368,7 +1364,13 @@
     rsl.textContent = seLabel;
     rsl.classList.toggle('empty', !se);
 
-    var nPhotos = 0, modeLabel = '—', modeEmpty = true;
+    // (19/10/2026) Le foto di ANALISI (orientate, solo modalità A) si contano a parte dalla
+    // DOCUMENTAZIONE FOTOGRAFICA (4 caselle, in A e in B), che non entra nei calcoli.
+    var nPhotos = 0, nDoc = 0, modeLabel = '—', modeEmpty = true;
+    ['Doc1','Doc2','Doc3','Doc4'].forEach(function(s){
+      var prev = document.getElementById('preview'+s);
+      if (prev && prev.classList.contains('active')) nDoc++;
+    });
     if (modeBtnA){
       modeLabel = 'A · Chioma libera';
       modeEmpty = false;
@@ -1379,17 +1381,15 @@
     } else if (document.getElementById('btnModeDense').classList.contains('selected')){
       modeLabel = 'B · Chiome sovrapposte';
       modeEmpty = false;
-      var grid = document.getElementById('previewGridB');
-      nPhotos += grid ? grid.children.length : 0;
-      ['InclN','InclE','InclS','InclO'].forEach(function(s){
-        var prev = document.getElementById('preview'+s);
-        if (prev && prev.classList.contains('active')) nPhotos++;
-      });
+      // (19/10/2026) In B non ci sono più foto di analisi: né quelle del fusto né la griglia
+      // vecchia. Restano solo le foto di documentazione, contate sopra.
     }
     rm.textContent = modeLabel;
     rm.classList.toggle('empty', modeEmpty);
-    rp.textContent = nPhotos > 0 ? String(nPhotos) : '0';
-    rp.classList.toggle('empty', nPhotos === 0);
+    var testoFoto = nPhotos > 0 ? String(nPhotos) : '0';
+    if (nDoc > 0) testoFoto = (nPhotos > 0 ? nPhotos + ' + ' : '') + nDoc + ' documentazione';
+    rp.textContent = testoFoto;
+    rp.classList.toggle('empty', nPhotos === 0 && nDoc === 0);
   }
 </script>
 
